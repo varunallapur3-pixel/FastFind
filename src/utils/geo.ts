@@ -85,8 +85,11 @@ export function getGoogleMapsDirUrl(
   userLng?: number
 ): string {
   const destParam = `${destLat},${destLng}`;
-  const queryLabel = encodeURIComponent(`${destinationName}`);
+  const originParam =
+    userLat !== undefined && userLng !== undefined
+      ? `${userLat},${userLng}`
+      : 'My+Location';
 
-  // Force origin to "My+Location" so Google Maps uses the device's physical GPS hardware!
-  return `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${destParam}&destination_place_id=${queryLabel}&travelmode=driving`;
+  // Do NOT pass text or lat/lng to destination_place_id as Google Maps URL API requires an actual Google Place ID hash.
+  return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Place } from '../types';
+import { getGoogleMapsDirUrl } from '../utils/geo';
 import {
   X,
   Star,
@@ -178,8 +179,8 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
             <button
               onClick={() => {
-                const destination = encodeURIComponent(`${place.name}, ${place.address}`);
-                window.open(`https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${place.coords.lat},${place.coords.lng}`, '_blank');
+                const mapsUrl = getGoogleMapsDirUrl(place.name, place.address, place.coords.lat, place.coords.lng);
+                window.open(mapsUrl, '_blank');
               }}
               className="flex items-center justify-center gap-2 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-sm py-4 rounded-xl shadow-[0_0_20px_rgba(169,249,0,0.4)] active:scale-95 transition-all cursor-pointer"
             >
