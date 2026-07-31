@@ -592,22 +592,20 @@ export const api = {
 
     let results = generatePlacesAroundUser(userCoords, locationLabel);
 
-    // 1. Category Filter
-    if (filter.category && filter.category !== 'all') {
-      results = results.filter((p) => p.category === filter.category);
-    }
-
-    // 2. Query / Keyword Search
+    // 1 & 2. Query / Keyword & Category Filter
     if (filter.query && filter.query.trim() !== '') {
       const q = filter.query.toLowerCase().trim();
       results = results.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
+          p.category.toLowerCase().includes(q) ||
           p.categoryLabel.toLowerCase().includes(q) ||
           p.aiSummary.toLowerCase().includes(q) ||
           p.address.toLowerCase().includes(q) ||
           p.tags.some((t) => t.toLowerCase().includes(q))
       );
+    } else if (filter.category && filter.category !== 'all') {
+      results = results.filter((p) => p.category === filter.category);
     }
 
     // 3. Min Rating Filter

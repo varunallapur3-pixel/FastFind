@@ -152,9 +152,11 @@ export function App() {
           setUser(authenticatedUser);
           setHasStarted(true);
           setAlertNotification(`Welcome back, ${authenticatedUser.name}!`);
+          requestGPSLocation();
         }}
         onContinueAsGuest={() => {
           setHasStarted(true);
+          requestGPSLocation();
         }}
       />
     );

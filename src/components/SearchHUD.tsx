@@ -40,12 +40,15 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     onSearch(inputValue);
-    setTimeout(() => {
-      document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+    const target = document.getElementById('results-section');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 500, behavior: 'smooth' });
+    }
   };
 
   const handleClear = () => {
@@ -90,6 +93,7 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
         {/* Search trigger button */}
         <button
           type="submit"
+          onClick={handleSubmit}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-xs shadow-[0_0_15px_rgba(0,219,233,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
           title="Search Places Nearby"
         >
