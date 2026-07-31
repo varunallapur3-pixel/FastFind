@@ -107,12 +107,45 @@ export function App() {
 
   // Handle Search Input Change
   const handleSearch = (query: string) => {
-    setFilter((prev) => ({ ...prev, query }));
+    setFilter((prev) => ({
+      ...prev,
+      query,
+      category: query.trim() !== '' ? 'all' : prev.category,
+    }));
   };
 
-  // Handle Category Select & Auto-Nav top rated
+  // Handle Manual Search Submit (Click on SEARCH NEARBY button or Enter key)
+  const handleManualSearchSubmit = (query: string) => {
+    const activeQuery = query.trim();
+    const updatedFilter: SearchFilter = {
+      ...filter,
+      query: activeQuery,
+      category: activeQuery !== '' ? 'all' : filter.category,
+    };
+    setFilter(updatedFilter);
+    fetchPlaces(updatedFilter, userCoords, locationLabel);
+    setAlertNotification(`🔍 Searching 4km radius for "${activeQuery || 'All Places'}"...`);
+    setTimeout(() => setAlertNotification(null), 3000);
+
+    setTimeout(() => {
+      const section = document.getElementById('results-section');
+      if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 480, behavior: 'smooth' });
+      }
+    }, 50);
+  };
+
+  // Handle Category Select
   const handleSelectCategory = (cat: CategoryId) => {
-    setFilter((prev) => ({ ...prev, category: cat }));
+    const updatedFilter: SearchFilter = {
+      ...filter,
+      category: cat,
+      query: '',
+    };
+    setFilter(updatedFilter);
+    fetchPlaces(updatedFilter, userCoords, locationLabel);
   };
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
@@ -260,6 +293,7 @@ export function App() {
             selectedCategory={filter.category}
             onSelectCategory={handleSelectCategory}
             onAutoNavigateTopRated={handleAutoNavigateTopRated}
+            onManualSearchSubmit={handleManualSearchSubmit}
           />
 
           {/* Category Bento Grid */}

@@ -9,13 +9,14 @@ interface SearchHUDProps {
   selectedCategory?: CategoryId;
   onSelectCategory: (cat: CategoryId) => void;
   onAutoNavigateTopRated: (query: string) => void;
+  onManualSearchSubmit?: (query: string) => void;
 }
 
 export const SearchHUD: React.FC<SearchHUDProps> = ({
   onSearch,
   currentQuery,
   onSelectCategory,
-  onAutoNavigateTopRated,
+  onManualSearchSubmit,
 }) => {
   const [inputValue, setInputValue] = useState(currentQuery);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -40,14 +41,22 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    onSearch(inputValue);
-    const target = document.getElementById('results-section');
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const handleSubmit = (e?: React.SyntheticEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const val = inputValue.trim();
+    if (onManualSearchSubmit) {
+      onManualSearchSubmit(val);
     } else {
-      window.scrollTo({ top: 500, behavior: 'smooth' });
+      onSearch(val);
+      const target = document.getElementById('results-section');
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else {
+        window.scrollTo({ top: 480, behavior: 'smooth' });
+      }
     }
   };
 
@@ -92,7 +101,7 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
 
         {/* Search trigger button */}
         <button
-          type="submit"
+          type="button"
           onClick={handleSubmit}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-xs shadow-[0_0_15px_rgba(0,219,233,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
           title="Search Places Nearby"
