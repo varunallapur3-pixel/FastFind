@@ -43,6 +43,9 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSearch(inputValue);
+    setTimeout(() => {
+      document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
   };
 
   const handleClear = () => {

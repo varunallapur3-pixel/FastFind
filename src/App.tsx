@@ -45,6 +45,8 @@ export function App() {
     sortBy: 'rating',
   });
 
+  const [selectedCity, setSelectedCity] = useState<string>('gps');
+
   // Request browser Hardware GPS location
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
@@ -53,10 +55,12 @@ export function App() {
       setUserCoords({ lat: details.lat, lng: details.lng });
       setLocationLabel('Your Exact GPS Location');
       setGpsStatus('locked');
-      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within 2km`);
+      setSelectedCity('gps');
+      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within 4km radius`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err: any) {
       setGpsStatus('manual');
+      setSelectedCity('vijayapura');
       setAlertNotification('⚠️ Browser location permission required. Click "GRANT / RE-SYNC GPS" to enable live nearby search.');
     }
   }, []);
@@ -67,11 +71,16 @@ export function App() {
 
   // Handle Manual City Select
   const handleCitySelect = (cityKey: string) => {
+    if (cityKey === 'gps') {
+      requestGPSLocation();
+      return;
+    }
     const city = CITY_COORDS[cityKey];
     if (city) {
       setUserCoords({ lat: city.lat, lng: city.lng });
       setLocationLabel(city.name);
       setGpsStatus('manual');
+      setSelectedCity(cityKey);
       setAlertNotification(`Location manually set to ${city.name}`);
       setTimeout(() => setAlertNotification(null), 3000);
     }
@@ -201,8 +210,9 @@ export function App() {
             <select
               onChange={(e) => handleCitySelect(e.target.value)}
               className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer font-bold"
-              defaultValue="vijayapura"
+              value={selectedCity}
             >
+              <option value="gps">📍 GPS Location (Active)</option>
               <option value="vijayapura">Vijayapura</option>
               <option value="bengaluru">Bengaluru</option>
               <option value="hyderabad">Hyderabad</option>
@@ -237,7 +247,7 @@ export function App() {
             {/* Quick Mode Pill */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1c1b1b] border border-[#a9f900]/30 font-mono text-xs text-[#a9f900] shrink-0">
               <Shield className="w-4 h-4 text-[#a9f900]" />
-              <span>RADIUS: &lt; 1KM - 2KM PROXIMITY</span>
+              <span>RADIUS: &lt; 4KM (4000M) PROXIMITY</span>
             </div>
           </div>
 
@@ -348,7 +358,7 @@ export function App() {
         </section>
 
         {/* RESULTS GRID / FAVORITES VIEW */}
-        <section className="mb-12">
+        <section id="results-section" className="mb-12">
           <div className="flex items-center justify-between mb-4 font-mono text-xs">
             <h2 className="text-[#b9cacb] uppercase tracking-wider">
               {activeView === 'favorites'
