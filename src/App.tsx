@@ -88,7 +88,6 @@ export function App() {
 
   // Fetch places centered on userCoords
   const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords, label: string) => {
-    setLoading(true);
     try {
       const results = await api.searchPlaces(currentFilter, coords, label);
       setPlaces(results);
@@ -106,24 +105,30 @@ export function App() {
   }, [filter, userCoords, locationLabel, fetchPlaces, hasStarted]);
 
   // Handle Search Input Change
-  const handleSearch = (query: string) => {
-    setFilter((prev) => ({
-      ...prev,
-      query,
-      category: query.trim() !== '' ? 'all' : prev.category,
-    }));
-  };
+  const handleSearch = useCallback((query: string) => {
+    setFilter((prev) => {
+      const nextCategory = query.trim() !== '' ? 'all' : prev.category;
+      if (prev.query === query && prev.category === nextCategory) return prev;
+      return {
+        ...prev,
+        query,
+        category: nextCategory,
+      };
+    });
+  }, []);
 
   // Handle Manual Search Submit (Click on SEARCH NEARBY button or Enter key)
-  const handleManualSearchSubmit = (query: string) => {
+  const handleManualSearchSubmit = useCallback((query: string) => {
     const activeQuery = query.trim();
-    const updatedFilter: SearchFilter = {
-      ...filter,
-      query: activeQuery,
-      category: activeQuery !== '' ? 'all' : filter.category,
-    };
-    setFilter(updatedFilter);
-    fetchPlaces(updatedFilter, userCoords, locationLabel);
+    setFilter((prev) => {
+      const nextCategory = activeQuery !== '' ? 'all' : prev.category;
+      return {
+        ...prev,
+        query: activeQuery,
+        category: nextCategory,
+      };
+    });
+
     setAlertNotification(`🔍 Searching 4km radius for "${activeQuery || 'All Places'}"...`);
     setTimeout(() => setAlertNotification(null), 3000);
 
@@ -135,18 +140,19 @@ export function App() {
         window.scrollTo({ top: 480, behavior: 'smooth' });
       }
     }, 50);
-  };
+  }, []);
 
   // Handle Category Select
-  const handleSelectCategory = (cat: CategoryId) => {
-    const updatedFilter: SearchFilter = {
-      ...filter,
-      category: cat,
-      query: '',
-    };
-    setFilter(updatedFilter);
-    fetchPlaces(updatedFilter, userCoords, locationLabel);
-  };
+  const handleSelectCategory = useCallback((cat: CategoryId) => {
+    setFilter((prev) => {
+      if (prev.category === cat && prev.query === '') return prev;
+      return {
+        ...prev,
+        category: cat,
+        query: '',
+      };
+    });
+  }, []);
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
     const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, locationLabel);

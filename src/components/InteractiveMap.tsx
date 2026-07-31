@@ -22,7 +22,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const markersGroup = useRef<L.LayerGroup | null>(null);
   const polylineLayer = useRef<L.Polyline | null>(null);
 
-  // Initialize Map
+  // Initialize Map & Recenter when GPS coordinates change
   useEffect(() => {
     if (!mapRef.current) return;
 
@@ -48,7 +48,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } else {
       leafletMap.current.panTo([userCoords.lat, userCoords.lng]);
     }
-  }, [userCoords]);
+  }, [userCoords.lat, userCoords.lng]);
 
   // Update Markers & Polyline
   useEffect(() => {
@@ -142,7 +142,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       // Pan to fit route bounds
       map.panTo([selectedPlace.coords.lat, selectedPlace.coords.lng]);
     }
-  }, [places, selectedPlace, userCoords, onSelectPlace, onStartNavigation]);
+  }, [places, selectedPlace, userCoords.lat, userCoords.lng, onSelectPlace, onStartNavigation]);
 
   return (
     <div className="relative w-full h-80 md:h-96 rounded-2xl overflow-hidden glass-card border border-white/10 shadow-2xl">

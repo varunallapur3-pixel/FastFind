@@ -23,11 +23,12 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
 
   // Debounce search handler (300ms)
   useEffect(() => {
+    if (inputValue === currentQuery) return;
     const timer = setTimeout(() => {
       onSearch(inputValue);
     }, 300);
     return () => clearTimeout(timer);
-  }, [inputValue, onSearch]);
+  }, [inputValue, currentQuery, onSearch]);
 
   // Global CMD+K shortcut to focus search input
   useEffect(() => {
