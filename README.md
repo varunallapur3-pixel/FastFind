@@ -1,12 +1,11 @@
-# ⚡ FindFast AI - Instant Top-Rated Place Navigation
+# ⚡ FastFind - Instant Top-Rated Place Navigation
 
 [![React](https://img.shields.io/badge/React-18-00dbe9?logo=react)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-38bdf8?logo=tailwindcss)](https://tailwindcss.com/)
 [![Vite](https://img.shields.io/badge/Vite-6.1-646cff?logo=vite)](https://vitejs.dev/)
-[![Express](https://img.shields.io/badge/Express-4.21-000000?logo=express)](https://expressjs.com/)
 
-**FindFast AI** is a futuristic, neon-themed geospatial place finder application. Built on the *Hyper-Fast Neon Synthetic* design system, it automatically identifies, ranks, and navigates users to the **#1 Highest-Rated Place** matching any category or query directly via **Google Maps** or an in-app interactive Leaflet HUD.
+**FastFind** is a futuristic, neon-themed geospatial place finder web application. Built on the *Hyper-Fast Neon Synthetic* design system, it automatically identifies, ranks, and navigates users to the **#1 Highest-Rated Place** matching any category or query directly via **Google Maps** or an in-app interactive Leaflet HUD.
 
 ---
 
@@ -20,67 +19,18 @@
 
 ---
 
-## 📂 Repository Structure
-
-```
-.
-├── 📁 frontend/             # Single-Page Web App (React + Vite + Leaflet)
-│   ├── src/                 # Components, Hooks, Services & Types
-│   ├── index.html           # Font & asset entrypoint
-│   └── package.json
-│
-└── 📁 backend/              # Node.js + Express API Server
-    ├── src/                 # Express API Routes, Middleware & Controllers
-    ├── schema.sql           # PostgreSQL + PostGIS Spatial DB Schema
-    └── package.json
-```
-
----
-
 ## 🚀 Quick Start Guide
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) v18+ & NPM v9+
-
-### 1. Installation
-
-Clone the repository and install dependencies for both frontend and backend:
-
 ```bash
-git clone https://github.com/your-username/findfast-ai.git
-cd findfast-ai
+# 1. Install dependencies
+npm install
 
-# Install frontend dependencies
-cd frontend && npm install && cd ..
+# 2. Run local development server
+npm run dev
 
-# Install backend dependencies
-cd backend && npm install && cd ..
-```
-
-### 2. Local Development
-
-Start both frontend and backend dev servers from the root directory:
-
-```bash
-# Terminal 1: Run Frontend UI (http://localhost:3000)
-npm run dev:frontend
-
-# Terminal 2: Run Backend API (http://localhost:8000)
-npm run dev:backend
-```
-
----
-
-## 🛠 Production Build & Deployment
-
-### Build Everything
-```bash
+# 3. Build production bundle
 npm run build
 ```
-
-### Deployment Guidelines
-- **Frontend**: Deploy the `frontend/dist` directory to **Vercel**, **Netlify**, or **Cloudflare Pages**.
-- **Backend**: Deploy `backend/dist` to **Render**, **Railway**, or **AWS ECS**.
 
 ---
 
