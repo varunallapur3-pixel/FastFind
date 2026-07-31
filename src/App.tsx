@@ -310,29 +310,6 @@ export function App() {
           />
         </section>
 
-        {/* INTERACTIVE MAP CONTAINER */}
-        <section className="mb-10">
-          <div className="flex items-center justify-between mb-3 font-mono text-xs">
-            <h3 className="text-[#849495] uppercase tracking-wider flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#00dbe9]" />
-              <span>GEOSPATIAL MAP HUD (ORIGIN: YOUR EXACT GPS)</span>
-            </h3>
-            {selectedPlace && (
-              <span className="text-[#a9f900]">
-                ROUTE ACTIVE TO: <strong>{selectedPlace.name}</strong>
-              </span>
-            )}
-          </div>
-
-          <InteractiveMap
-            places={places}
-            selectedPlace={selectedPlace}
-            userCoords={userCoords}
-            onSelectPlace={(p) => setSelectedPlace(p)}
-            onStartNavigation={(p) => openGoogleMapsNav(p)}
-          />
-        </section>
-
         {/* RATING, DISTANCE RADIUS & SORT FILTER CONTROLS */}
         <section className="mb-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[#131313] border border-white/10 font-mono text-xs">
           <div className="flex items-center gap-2">
