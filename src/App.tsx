@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Place, CategoryId, User, ActiveView, SearchFilter } from './types';
+import { Place, CategoryId, User, ActiveView, SearchFilter, Coords } from './types';
 import { api } from './services/api';
+import { getUserLocation, getGoogleMapsDirUrl } from './utils/geo';
 import { Navbar } from './components/Navbar';
 import { SearchHUD } from './components/SearchHUD';
 import { CategoryGrid } from './components/CategoryGrid';
@@ -11,11 +12,15 @@ import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BottomHUD } from './components/BottomHUD';
-import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink } from 'lucide-react';
+import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate, CheckCircle } from 'lucide-react';
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [hasStarted, setHasStarted] = useState(false); // Controls start landing screen vs main app
+  const [hasStarted, setHasStarted] = useState(false);
+
+  // User Live GPS Coords
+  const [userCoords, setUserCoords] = useState<Coords>({ lat: 37.7749, lng: -122.4194 });
+  const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'default'>('requesting');
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,15 +39,35 @@ export function App() {
     query: '',
     category: 'all',
     minRating: 0,
+    maxDistanceKm: 0, // 0 = all
     openNow: false,
     sortBy: 'rating',
   });
 
-  // Fetch places based on filter
-  const fetchPlaces = useCallback(async (currentFilter: SearchFilter) => {
+  // Fetch real-time GPS location on app startup
+  const requestGPSLocation = useCallback(async () => {
+    setGpsStatus('requesting');
+    try {
+      const coords = await getUserLocation();
+      setUserCoords(coords);
+      setGpsStatus('locked');
+      setAlertNotification(`GPS Locked to your exact location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
+      setTimeout(() => setAlertNotification(null), 4000);
+    } catch (err) {
+      console.warn('Geolocation fallback to default', err);
+      setGpsStatus('default');
+    }
+  }, []);
+
+  useEffect(() => {
+    requestGPSLocation();
+  }, [requestGPSLocation]);
+
+  // Fetch places based on filter & userCoords
+  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords) => {
     setLoading(true);
     try {
-      const results = await api.searchPlaces(currentFilter);
+      const results = await api.searchPlaces(currentFilter, coords);
       setPlaces(results);
     } catch (err) {
       console.error('Search places error', err);
@@ -53,9 +78,9 @@ export function App() {
 
   useEffect(() => {
     if (hasStarted) {
-      fetchPlaces(filter);
+      fetchPlaces(filter, userCoords);
     }
-  }, [filter, fetchPlaces, hasStarted]);
+  }, [filter, userCoords, fetchPlaces, hasStarted]);
 
   // Handle Search Input Change
   const handleSearch = (query: string) => {
@@ -68,20 +93,26 @@ export function App() {
   };
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
-    const topPlace = await api.getTopRatedPlace(searchTermOrCat);
+    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords);
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
-      setAlertNotification('No top match found for your search criteria.');
+      setAlertNotification('No top match found within specified perimeter.');
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
 
-  // Open Direct Google Maps Navigation
+  // Open Direct Google Maps Navigation from USER'S EXACT GPS LOCATION to DESTINATION
   const openGoogleMapsNav = (place: Place) => {
-    const destination = encodeURIComponent(`${place.name}, ${place.address}`);
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${place.coords.lat},${place.coords.lng}`;
-    window.open(url, '_blank');
+    const mapsUrl = getGoogleMapsDirUrl(
+      place.name,
+      place.address,
+      place.coords.lat,
+      place.coords.lng,
+      userCoords.lat,
+      userCoords.lng
+    );
+    window.open(mapsUrl, '_blank');
   };
 
   // Toggle Favorite
@@ -121,7 +152,7 @@ export function App() {
         }}
         onGoHome={() => {
           setActiveView('home');
-          setFilter({ query: '', category: 'all', minRating: 0, openNow: false, sortBy: 'rating' });
+          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 0, openNow: false, sortBy: 'rating' });
         }}
         onOpenFavorites={() => setActiveView('favorites')}
         favoritesCount={favorites.length}
@@ -141,6 +172,25 @@ export function App() {
           </div>
         )}
 
+        {/* GPS LIVE LOCATION STATUS HUD BAR */}
+        <section className="mb-6 p-3 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+          <div className="flex items-center gap-2">
+            <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-[#00dbe9]'}`} />
+            <span className="text-[#849495] uppercase">CURRENT GPS LOCATION:</span>
+            <span className="text-[#00dbe9] font-bold">
+              {gpsStatus === 'locked' ? `${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)}` : 'APPROXIMATE PERIMETER'}
+            </span>
+          </div>
+
+          <button
+            onClick={requestGPSLocation}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00dbe9]/10 text-[#00dbe9] border border-[#00dbe9]/30 hover:bg-[#00dbe9] hover:text-[#00363a] transition-all cursor-pointer font-bold"
+          >
+            <Locate className="w-3.5 h-3.5" />
+            <span>RE-SYNC GPS LOCATION</span>
+          </button>
+        </section>
+
         {/* HERO HEADER & PERSISTENT SEARCH HUD */}
         <section className="mb-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
@@ -157,7 +207,7 @@ export function App() {
             {/* Quick Mode Pill */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1c1b1b] border border-[#a9f900]/30 font-mono text-xs text-[#a9f900] shrink-0">
               <Shield className="w-4 h-4 text-[#a9f900]" />
-              <span>TOP-RATED GOOGLE MAPS AUTO-NAV</span>
+              <span>LIVE GPS GOOGLE MAPS NAVIGATION</span>
             </div>
           </div>
 
@@ -183,7 +233,7 @@ export function App() {
           <div className="flex items-center justify-between mb-3 font-mono text-xs">
             <h3 className="text-[#849495] uppercase tracking-wider flex items-center gap-2">
               <MapPin className="w-4 h-4 text-[#00dbe9]" />
-              <span>REAL-TIME GEOSPATIAL MAP HUD</span>
+              <span>GEOSPATIAL MAP HUD (ORIGIN: YOUR GPS POSITION)</span>
             </h3>
             {selectedPlace && (
               <span className="text-[#a9f900]">
@@ -195,19 +245,56 @@ export function App() {
           <InteractiveMap
             places={places}
             selectedPlace={selectedPlace}
+            userCoords={userCoords}
             onSelectPlace={(p) => setSelectedPlace(p)}
             onStartNavigation={(p) => openGoogleMapsNav(p)}
           />
         </section>
 
-        {/* RATING & DISTANCE FILTER CONTROLS */}
+        {/* RATING, DISTANCE RADIUS & SORT FILTER CONTROLS */}
         <section className="mb-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[#131313] border border-white/10 font-mono text-xs">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-[#00dbe9]" />
-            <span className="text-[#849495] uppercase">SORT & FILTER RESULTS:</span>
+            <span className="text-[#849495] uppercase">DISTANCE & RATING FILTER:</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Distance Radius Filter Buttons */}
+            <div className="flex rounded-lg bg-[#1c1b1b] p-1 border border-white/10">
+              <button
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 1 }))}
+                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
+                  filter.maxDistanceKm === 1 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                }`}
+              >
+                &lt; 1 KM
+              </button>
+              <button
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 3 }))}
+                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
+                  filter.maxDistanceKm === 3 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                }`}
+              >
+                &lt; 3 KM
+              </button>
+              <button
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 5 }))}
+                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
+                  filter.maxDistanceKm === 5 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                }`}
+              >
+                &lt; 5 KM
+              </button>
+              <button
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 0 }))}
+                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
+                  filter.maxDistanceKm === 0 ? 'bg-[#00dbe9] text-[#00363a]' : 'text-[#849495] hover:text-white'
+                }`}
+              >
+                ALL DISTANCES
+              </button>
+            </div>
+
             {/* Sort Buttons */}
             <div className="flex rounded-lg bg-[#1c1b1b] p-1 border border-white/10">
               <button
@@ -227,18 +314,6 @@ export function App() {
                 NEAREST DISTANCE
               </button>
             </div>
-
-            {/* Open now filter */}
-            <button
-              onClick={() => setFilter((prev) => ({ ...prev, openNow: !prev.openNow }))}
-              className={`px-3 py-1.5 rounded-lg border font-bold transition-all cursor-pointer ${
-                filter.openNow
-                  ? 'bg-[#a9f900]/20 text-[#a9f900] border-[#a9f900]'
-                  : 'bg-white/5 border-white/10 text-[#849495] hover:text-white'
-              }`}
-            >
-              OPEN NOW ONLY
-            </button>
           </div>
         </section>
 
@@ -248,14 +323,14 @@ export function App() {
             <h2 className="text-[#b9cacb] uppercase tracking-wider">
               {activeView === 'favorites'
                 ? `SAVED FAVORITE PLACES (${places.filter((p) => favorites.includes(p.id)).length})`
-                : `INTELLIGENTLY RANKED PLACES (${places.length} FOUND)`}
+                : `INTELLIGENTLY RANKED PLACES NEARBY (${places.length} FOUND)`}
             </h2>
             <span className="text-[#00dbe9]">AUTO-SORT: HIGHEST RATING FIRST</span>
           </div>
 
           {loading ? (
             <div className="py-16 text-center font-mono text-sm text-[#00dbe9] animate-pulse">
-              ANALYZING LOCAL PERIMETER NODES & REVIEWS...
+              CALCULATING DISTANCE & RATING FROM YOUR GPS LOCATION...
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -309,9 +384,11 @@ export function App() {
                           />
                         </button>
 
-                        {/* Bottom overlay text */}
+                        {/* Bottom overlay text with exact km distance from user */}
                         <div className="absolute bottom-2 left-3 right-3 flex justify-between items-center font-mono text-[11px] text-[#e5e2e1]">
-                          <span>{place.distanceMiles} miles away</span>
+                          <span className="text-[#00dbe9] font-bold">
+                            {place.distanceKm ? `${place.distanceKm} km away` : `${place.distanceMiles} mi away`}
+                          </span>
                           <span className="text-[#a9f900] font-bold">{place.durationMins} mins ETA</span>
                         </div>
                       </div>
@@ -341,7 +418,7 @@ export function App() {
                       <button
                         onClick={() => openGoogleMapsNav(place)}
                         className="flex items-center justify-center gap-1 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-xs py-3 rounded-xl shadow-[0_0_15px_rgba(169,249,0,0.3)] active:scale-95 transition-all cursor-pointer"
-                        title="Open direct turn-by-turn navigation in Google Maps"
+                        title="Open direct turn-by-turn navigation in Google Maps from your current location"
                       >
                         <Navigation className="w-3.5 h-3.5 fill-current" />
                         <span>GOOGLE MAPS</span>

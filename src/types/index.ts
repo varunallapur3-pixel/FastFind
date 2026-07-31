@@ -43,6 +43,7 @@ export interface Place {
   rating: number; // e.g. 4.9
   totalReviews: number;
   distanceMiles: number; // e.g. 0.2
+  distanceKm?: number; // e.g. 0.5 km
   durationMins: number; // e.g. 3
   address: string;
   phone: string;
@@ -82,6 +83,7 @@ export interface SearchFilter {
   query: string;
   category: CategoryId;
   minRating: number;
+  maxDistanceKm?: number; // 1km, 5km, 10km, 0 = all
   openNow: boolean;
   sortBy: 'rating' | 'distance' | 'speed';
 }
