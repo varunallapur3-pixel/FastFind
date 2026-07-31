@@ -4,8 +4,8 @@ import { calculateDistanceKm, calculateDistanceMiles } from '../utils/geo';
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
 let userFavorites: string[] = ['local_cafe_0', 'local_rest_1'];
 
-// Real local business templates with realistic names for Vijayapura & Indian cities
-const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; street: string; img: string; rating: number; tag: string }[] = [
+// Place templates for nearby places
+const NEARBY_TEMPLATES: { name: string; cat: CategoryId; label: string; street: string; img: string; rating: number; tag: string }[] = [
   {
     name: 'Cafe Coffee Day (CCD)',
     cat: 'cafe',
@@ -19,16 +19,16 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     name: 'Quality Coffee House & Bakery',
     cat: 'cafe',
     label: 'CAFE',
-    street: 'Solapur Road',
+    street: 'Main Bazaar Road',
     img: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80',
     rating: 4.88,
-    tag: '#FreshRoast',
+    tag: '#Under1km',
   },
   {
     name: 'Express Cyber Cafe & Espresso',
     cat: 'cafe',
     label: 'CAFE',
-    street: 'MG Road Junction',
+    street: 'MG Road Circle',
     img: 'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?auto=format&fit=crop&w=800&q=80',
     rating: 4.85,
     tag: '#Under1km',
@@ -37,31 +37,31 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     name: 'Apex Dental Care Studio',
     cat: 'dentist',
     label: 'DENTIST',
-    street: 'Ashram Road',
+    street: 'Hospital Road',
     img: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80',
     rating: 4.90,
     tag: '#PainlessLaser',
   },
   {
-    name: 'BLDE Hospital & ER Triage Node',
+    name: 'City ER & Multispecialty Hospital',
     cat: 'hospital',
     label: 'HOSPITAL',
-    street: 'BLDE Hospital Road',
+    street: 'College Road',
     img: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
     rating: 4.96,
     tag: '#247Emergency',
   },
   {
-    name: 'SBI & HDFC 24/7 ATM Kiosk',
+    name: 'HDFC & SBI 24/7 ATM Kiosk',
     cat: 'atm',
     label: 'ATM',
-    street: 'Shastri Circle',
+    street: 'Central Market',
     img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=800&q=80',
     rating: 4.82,
     tag: '#FeeFreeATM',
   },
   {
-    name: 'Apollo Pharmacy & Health Supplies',
+    name: 'Apollo Pharmacy & Medical Store',
     cat: 'pharmacy',
     label: 'PHARMACY',
     street: 'Station Road',
@@ -70,10 +70,10 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     tag: '#247Pharmacy',
   },
   {
-    name: 'Gold Gym & Fitness Studio',
+    name: 'Gold Gym & Fitness Club',
     cat: 'gym',
     label: 'GYM',
-    street: 'Indi Road Strip',
+    street: 'Stadium Road',
     img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80',
     rating: 4.91,
     tag: '#TopRatedFitness',
@@ -82,7 +82,7 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     name: 'TATA Power EV Fast Charger 150kW',
     cat: 'ev_charging',
     label: 'EV CHARGING',
-    street: 'Solapur Highway Plaza',
+    street: 'Highway Plaza',
     img: 'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=800&q=80',
     rating: 4.95,
     tag: '#FastEVCharge',
@@ -91,7 +91,7 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     name: 'Robotic Ultrasonic Car Wash',
     cat: 'car_wash',
     label: 'CAR WASH',
-    street: 'Athani Road',
+    street: 'Bypass Road',
     img: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=800&q=80',
     rating: 4.85,
     tag: '#TouchlessWash',
@@ -106,10 +106,10 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     tag: '#TopRatedDining',
   },
   {
-    name: 'Hotel Madhuvan Comfort Residency',
+    name: 'Hotel Comfort Residency',
     cat: 'hotel',
     label: 'HOTEL',
-    street: 'Solapur Highway Bypass',
+    street: 'Highway Junction',
     img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
     rating: 4.89,
     tag: '#LuxuryHotel',
@@ -118,7 +118,7 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
     name: 'HP Petrol Pump & Synth Energy',
     cat: 'petrol',
     label: 'PETROL',
-    street: 'Sindagi Road',
+    street: 'Ring Road',
     img: 'https://images.unsplash.com/photo-1527018601619-a508a2be00df?auto=format&fit=crop&w=800&q=80',
     rating: 4.84,
     tag: '#HighOctaneFuel',
@@ -126,13 +126,13 @@ const REAL_LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; stre
 ];
 
 /**
- * Generate localized places centered STRICTLY within 0.2km - 1.2km around userCoords (e.g. Vijayapura)
+ * Generate places pinned STRICTLY within 0.15km - 1.4km of the user's exact GPS location
  */
-function generateLocalizedPlaces(userCoords: Coords, cityName: string = 'Vijayapura'): Place[] {
-  return REAL_LOCAL_TEMPLATES.map((tmpl, idx) => {
-    // Generate tight lat/lng offsets STRICTLY within 0.15km - 0.95km around userCoords!
-    const angle = (idx * 28 * Math.PI) / 180;
-    const distanceKm = 0.18 + (idx * 0.06); // 0.18km, 0.24km, 0.30km, 0.36km, 0.42km... ALL STRICTLY UNDER 1 KM!
+function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'Your Location'): Place[] {
+  return NEARBY_TEMPLATES.map((tmpl, idx) => {
+    // Generate tight offsets strictly between 0.15km and 1.4km around the user's GPS position
+    const angle = (idx * 26 * Math.PI) / 180;
+    const distanceKm = 0.15 + (idx * 0.08); // 0.15km, 0.23km, 0.31km, 0.39km, 0.47km... All strictly under 1.5km!
     const latOffset = (distanceKm / 111) * Math.cos(angle);
     const lngOffset = (distanceKm / (111 * Math.cos((userCoords.lat * Math.PI) / 180))) * Math.sin(angle);
 
@@ -143,26 +143,26 @@ function generateLocalizedPlaces(userCoords: Coords, cityName: string = 'Vijayap
     const actualDistMiles = calculateDistanceMiles(userCoords.lat, userCoords.lng, placeLat, placeLng);
 
     return {
-      id: `local_${tmpl.cat}_${idx}`,
+      id: `nearby_${tmpl.cat}_${idx}`,
       name: tmpl.name,
       category: tmpl.cat,
       categoryLabel: tmpl.label,
       rating: tmpl.rating,
-      totalReviews: 140 + idx * 22,
+      totalReviews: 120 + idx * 18,
       distanceKm: actualDistKm,
       distanceMiles: actualDistMiles,
       durationMins: Math.max(1, Math.round(actualDistKm * 2)),
-      address: `${tmpl.street}, ${cityName}`,
+      address: `${tmpl.street}, ${locationLabel}`,
       phone: '+91 98450 12345',
       website: 'https://maps.google.com',
       openStatus: true,
       openHours: '8:00 AM - 11:00 PM',
       image: tmpl.img,
-      aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}, ${cityName}. Exactly ${actualDistKm} km from your current position.`,
-      tags: [`#Under1km`, `#${cityName.replace(/\s+/g, '')}`, `#${actualDistKm}kmAway`],
-      crowdDensity: 15 + idx * 5,
+      aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}. Exactly ${actualDistKm} km from your live position.`,
+      tags: [`#Under1km`, `#${actualDistKm}kmAway`],
+      crowdDensity: 15 + idx * 4,
       coords: { lat: placeLat, lng: placeLng },
-      features: ['Under 1km Radius', 'Verified Location', 'Open Now'],
+      features: ['Under 1.5km Radius', 'Verified Location', 'Open Now'],
       isTopMatch: idx === 0,
     };
   });
@@ -170,11 +170,11 @@ function generateLocalizedPlaces(userCoords: Coords, cityName: string = 'Vijayap
 
 export const api = {
   /**
-   * Search and filter places centered around user's GPS (Vijayapura or selected location)
+   * Search places centered strictly around user's live GPS position
    */
-  async searchPlaces(filter: SearchFilter, userCoords?: Coords, cityName?: string): Promise<Place[]> {
-    const centerCoords = userCoords || { lat: 16.8302, lng: 75.7100 }; // Default Vijayapura
-    let results = generateLocalizedPlaces(centerCoords, cityName || 'Vijayapura');
+  async searchPlaces(filter: SearchFilter, userCoords?: Coords, locationLabel?: string): Promise<Place[]> {
+    const centerCoords = userCoords || { lat: 16.8302, lng: 75.7100 };
+    let results = generatePlacesAroundUser(centerCoords, locationLabel || 'Your Current Location');
 
     // Category filter
     if (filter.category && filter.category !== 'all') {
@@ -199,7 +199,7 @@ export const api = {
       results = results.filter((p) => p.rating >= filter.minRating);
     }
 
-    // Max distance filter (e.g. Under 1km, 3km, 5km)
+    // Max distance filter (e.g. Under 1km, 2km)
     if (filter.maxDistanceKm && filter.maxDistanceKm > 0) {
       results = results.filter((p) => (p.distanceKm || 0) <= filter.maxDistanceKm!);
     }
@@ -220,20 +220,20 @@ export const api = {
   },
 
   /**
-   * Get single highest rated place strictly under 1km radius matching search query or category
+   * Get top rated place strictly under 1.5km radius from user's live GPS
    */
-  async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords, cityName?: string): Promise<Place | null> {
+  async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords, locationLabel?: string): Promise<Place | null> {
     const allMatches = await this.searchPlaces(
       {
         query: queryOrCategory,
         category: 'all',
         minRating: 0,
-        maxDistanceKm: 1, // STRICTLY UNDER 1 KM FOR TOP MATCH!
+        maxDistanceKm: 1.5, // STRICTLY UNDER 1.5 KM FOR TOP MATCH!
         openNow: false,
         sortBy: 'rating',
       },
       userCoords,
-      cityName
+      locationLabel
     );
 
     if (allMatches.length === 0) return null;

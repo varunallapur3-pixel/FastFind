@@ -12,15 +12,15 @@ import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BottomHUD } from './components/BottomHUD';
-import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate } from 'lucide-react';
+import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate, Compass } from 'lucide-react';
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // User Live GPS Coords (Default: Vijayapura, Karnataka)
+  // User Live Hardware GPS Coords (Default: Vijayapura)
   const [userCoords, setUserCoords] = useState<Coords>({ lat: 16.8302, lng: 75.7100 });
-  const [currentCityName, setCurrentCityName] = useState<string>('Vijayapura, Karnataka');
+  const [locationLabel, setLocationLabel] = useState<string>('Vijayapura');
   const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'manual'>('requesting');
 
   const [places, setPlaces] = useState<Place[]>([]);
@@ -32,7 +32,7 @@ export function App() {
   const [autoNavPlace, setAutoNavPlace] = useState<Place | null>(null);
   const [activeNavPlace, setActiveNavPlace] = useState<Place | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(['local_cafe_0', 'local_restaurant_9']);
+  const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
   // Search Filter State (Defaults to < 1 KM Radius!)
@@ -45,20 +45,19 @@ export function App() {
     sortBy: 'rating',
   });
 
-  // Request browser GPS location
+  // Request browser Hardware GPS location
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
     try {
       const coords = await getUserLocation();
       setUserCoords(coords);
-      setCurrentCityName('Your Live GPS Location');
+      setLocationLabel('Your Exact GPS Location');
       setGpsStatus('locked');
-      setAlertNotification(`GPS Locked to your location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
+      setAlertNotification(`📍 Live GPS Locked to your device (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err) {
-      // Fallback to Vijayapura
       setUserCoords({ lat: 16.8302, lng: 75.7100 });
-      setCurrentCityName('Vijayapura, Karnataka');
+      setLocationLabel('Vijayapura');
       setGpsStatus('manual');
     }
   }, []);
@@ -67,23 +66,23 @@ export function App() {
     requestGPSLocation();
   }, [requestGPSLocation]);
 
-  // Handle City Change
+  // Handle Manual City Select
   const handleCitySelect = (cityKey: string) => {
     const city = CITY_COORDS[cityKey];
     if (city) {
       setUserCoords({ lat: city.lat, lng: city.lng });
-      setCurrentCityName(city.name);
+      setLocationLabel(city.name);
       setGpsStatus('manual');
-      setAlertNotification(`Location set to ${city.name}`);
+      setAlertNotification(`Location manually set to ${city.name}`);
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
 
-  // Fetch places based on filter & userCoords
-  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords, city: string) => {
+  // Fetch places centered on userCoords
+  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords, label: string) => {
     setLoading(true);
     try {
-      const results = await api.searchPlaces(currentFilter, coords, city);
+      const results = await api.searchPlaces(currentFilter, coords, label);
       setPlaces(results);
     } catch (err) {
       console.error('Search places error', err);
@@ -94,9 +93,9 @@ export function App() {
 
   useEffect(() => {
     if (hasStarted) {
-      fetchPlaces(filter, userCoords, currentCityName);
+      fetchPlaces(filter, userCoords, locationLabel);
     }
-  }, [filter, userCoords, currentCityName, fetchPlaces, hasStarted]);
+  }, [filter, userCoords, locationLabel, fetchPlaces, hasStarted]);
 
   // Handle Search Input Change
   const handleSearch = (query: string) => {
@@ -109,16 +108,16 @@ export function App() {
   };
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
-    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, currentCityName);
+    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, locationLabel);
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
-      setAlertNotification('No top match found within specified perimeter.');
+      setAlertNotification('No top match found within 1km radius.');
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
 
-  // Open Direct Google Maps Navigation from USER'S EXACT GPS LOCATION to DESTINATION
+  // Open Direct Google Maps Navigation starting ALWAYS from user's live GPS ("My Location")
   const openGoogleMapsNav = (place: Place) => {
     const mapsUrl = getGoogleMapsDirUrl(
       place.name,
@@ -168,7 +167,7 @@ export function App() {
         }}
         onGoHome={() => {
           setActiveView('home');
-          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 0, openNow: false, sortBy: 'rating' });
+          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 1, openNow: false, sortBy: 'rating' });
         }}
         onOpenFavorites={() => setActiveView('favorites')}
         favoritesCount={favorites.length}
@@ -192,9 +191,9 @@ export function App() {
         <section className="mb-6 p-3.5 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2">
             <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-[#00dbe9]'}`} />
-            <span className="text-[#849495] uppercase">CURRENT LOCATION:</span>
+            <span className="text-[#849495] uppercase">CURRENT HARDWARE GPS:</span>
             <span className="text-[#00dbe9] font-bold">
-              {currentCityName} ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})
+              {locationLabel} ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})
             </span>
           </div>
 
@@ -202,7 +201,7 @@ export function App() {
             {/* Quick City Switcher Dropdown */}
             <select
               onChange={(e) => handleCitySelect(e.target.value)}
-              className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer"
+              className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer font-bold"
               defaultValue="vijayapura"
             >
               <option value="vijayapura">Vijayapura</option>
@@ -215,10 +214,10 @@ export function App() {
 
             <button
               onClick={requestGPSLocation}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00dbe9]/10 text-[#00dbe9] border border-[#00dbe9]/30 hover:bg-[#00dbe9] hover:text-[#00363a] transition-all cursor-pointer font-bold"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#a9f900]/10 text-[#a9f900] border border-[#a9f900]/30 hover:bg-[#a9f900] hover:text-[#223600] transition-all cursor-pointer font-bold"
             >
               <Locate className="w-3.5 h-3.5" />
-              <span>LIVE GPS</span>
+              <span>GRANT / RE-SYNC GPS</span>
             </button>
           </div>
         </section>
@@ -239,7 +238,7 @@ export function App() {
             {/* Quick Mode Pill */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1c1b1b] border border-[#a9f900]/30 font-mono text-xs text-[#a9f900] shrink-0">
               <Shield className="w-4 h-4 text-[#a9f900]" />
-              <span>LOCALIZED NAV: {currentCityName.toUpperCase()}</span>
+              <span>RADIUS: &lt; 1KM - 2KM PROXIMITY</span>
             </div>
           </div>
 
@@ -265,7 +264,7 @@ export function App() {
           <div className="flex items-center justify-between mb-3 font-mono text-xs">
             <h3 className="text-[#849495] uppercase tracking-wider flex items-center gap-2">
               <MapPin className="w-4 h-4 text-[#00dbe9]" />
-              <span>GEOSPATIAL MAP HUD (ORIGIN: {currentCityName.toUpperCase()})</span>
+              <span>GEOSPATIAL MAP HUD (ORIGIN: YOUR EXACT GPS)</span>
             </h3>
             {selectedPlace && (
               <span className="text-[#a9f900]">
@@ -287,7 +286,7 @@ export function App() {
         <section className="mb-6 flex flex-wrap items-center justify-between gap-4 p-4 rounded-xl bg-[#131313] border border-white/10 font-mono text-xs">
           <div className="flex items-center gap-2">
             <Filter className="w-4 h-4 text-[#00dbe9]" />
-            <span className="text-[#849495] uppercase">DISTANCE & RATING FILTER:</span>
+            <span className="text-[#849495] uppercase">DISTANCE RADIUS FILTER:</span>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
@@ -302,12 +301,12 @@ export function App() {
                 &lt; 1 KM
               </button>
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 3 }))}
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 2 }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 3 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                  filter.maxDistanceKm === 2 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
                 }`}
               >
-                &lt; 3 KM
+                &lt; 2 KM
               </button>
               <button
                 onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 5 }))}
@@ -355,14 +354,14 @@ export function App() {
             <h2 className="text-[#b9cacb] uppercase tracking-wider">
               {activeView === 'favorites'
                 ? `SAVED FAVORITE PLACES (${places.filter((p) => favorites.includes(p.id)).length})`
-                : `INTELLIGENTLY RANKED PLACES NEAR ${currentCityName.toUpperCase()} (${places.length} FOUND)`}
+                : `HIGHEST RATED PLACES WITHIN 1KM RADIUS (${places.length} FOUND)`}
             </h2>
             <span className="text-[#00dbe9]">AUTO-SORT: HIGHEST RATING FIRST</span>
           </div>
 
           {loading ? (
             <div className="py-16 text-center font-mono text-sm text-[#00dbe9] animate-pulse">
-              CALCULATING DISTANCE & RATING FROM YOUR LOCATION...
+              CALCULATING EXACT DISTANCE FROM YOUR HARDWARE GPS...
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -400,7 +399,7 @@ export function App() {
                         {/* Top Match Tag */}
                         {isTopMatch && (
                           <span className="absolute top-3 left-3 bg-[#a9f900] text-[#223600] font-mono text-[10px] font-bold px-2.5 py-1 rounded-full shadow-[0_0_10px_#a9f900] flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 fill-current" /> TOP RATED MATCH
+                            <Sparkles className="w-3 h-3 fill-current" /> #1 HIGHEST RATED MATCH
                           </span>
                         )}
 
@@ -419,7 +418,7 @@ export function App() {
                         {/* Bottom overlay text with exact km distance from user */}
                         <div className="absolute bottom-2 left-3 right-3 flex justify-between items-center font-mono text-[11px] text-[#e5e2e1]">
                           <span className="text-[#00dbe9] font-bold">
-                            {place.distanceKm ? `${place.distanceKm} km away` : `${place.distanceMiles} mi away`}
+                            {place.distanceKm} km from your GPS
                           </span>
                           <span className="text-[#a9f900] font-bold">{place.durationMins} mins ETA</span>
                         </div>
@@ -450,7 +449,7 @@ export function App() {
                       <button
                         onClick={() => openGoogleMapsNav(place)}
                         className="flex items-center justify-center gap-1 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-xs py-3 rounded-xl shadow-[0_0_15px_rgba(169,249,0,0.3)] active:scale-95 transition-all cursor-pointer"
-                        title="Open direct turn-by-turn navigation in Google Maps from your location"
+                        title="Open Google Maps turn-by-turn navigation starting directly from your device location"
                       >
                         <Navigation className="w-3.5 h-3.5 fill-current" />
                         <span>GOOGLE MAPS</span>

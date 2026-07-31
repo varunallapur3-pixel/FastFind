@@ -26,7 +26,7 @@ export function calculateDistanceKm(
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10;
+  return Math.round(R * c * 100) / 100;
 }
 
 export function calculateDistanceMiles(
@@ -36,7 +36,7 @@ export function calculateDistanceMiles(
   lon2: number
 ): number {
   const km = calculateDistanceKm(lat1, lon1, lat2, lon2);
-  return Math.round(km * 0.621371 * 10) / 10;
+  return Math.round(km * 0.621371 * 100) / 100;
 }
 
 function deg2rad(deg: number): number {
@@ -44,7 +44,7 @@ function deg2rad(deg: number): number {
 }
 
 /**
- * Get user's current GPS location via browser Geolocation API
+ * Get user's current exact GPS location via browser Geolocation API
  */
 export function getUserLocation(): Promise<{ lat: number; lng: number }> {
   return new Promise((resolve, reject) => {
@@ -73,8 +73,8 @@ export function getUserLocation(): Promise<{ lat: number; lng: number }> {
 }
 
 /**
- * Generate Google Maps direction URL that forces device's live current location ("My Location")
- * or exact user coordinates directly to the place!
+ * Generate Google Maps direction URL forcing origin to "My Location" (Hardware GPS)
+ * This guarantees Google Maps routes directly from where the user is physically standing!
  */
 export function getGoogleMapsDirUrl(
   destinationName: string,
@@ -84,14 +84,9 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  const destQuery = encodeURIComponent(`${destinationName}, ${destinationAddress}`);
-  
-  // Format destination coordinates
-  const destCoords = `${destLat},${destLng}`;
+  const destParam = `${destLat},${destLng}`;
+  const queryLabel = encodeURIComponent(`${destinationName}`);
 
-  if (userLat && userLng) {
-    return `https://www.google.com/maps/dir/${userLat},${userLng}/${destCoords}/@${destLat},${destLng},15z/data=!3m1!4b1!4m2!4m1!3e0`;
-  }
-
-  return `https://www.google.com/maps/dir/My+Location/${destQuery}/@${destLat},${destLng},15z/data=!3m1!4b1!4m2!4m1!3e0`;
+  // Force origin to "My+Location" so Google Maps uses the device's physical GPS hardware!
+  return `https://www.google.com/maps/dir/?api=1&origin=My+Location&destination=${destParam}&destination_place_id=${queryLabel}&travelmode=driving`;
 }
