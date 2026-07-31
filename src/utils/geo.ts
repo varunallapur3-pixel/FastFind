@@ -84,14 +84,17 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  const originParam =
-    userLat !== undefined && userLng !== undefined
-      ? `${userLat},${userLng}`
-      : 'My+Location';
+  let originParam = 'My+Location';
 
-  // Always use exact latitude and longitude coordinates for destination.
-  // This guarantees 100% successful navigation directly to the target coordinates
-  // and prevents "Google Maps can't find..." search errors.
+  // Only pass userLat, userLng as origin if they are in reasonable proximity (< 100km) to destination.
+  // This prevents ISP IP-geolocation mismatches (e.g., ISP node in Bengaluru while viewing Vijayapura places).
+  if (userLat !== undefined && userLng !== undefined) {
+    const distKm = calculateDistanceKm(userLat, userLng, destLat, destLng);
+    if (distKm <= 100) {
+      originParam = `${userLat},${userLng}`;
+    }
+  }
+
   const destParam = `${destLat},${destLng}`;
 
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
