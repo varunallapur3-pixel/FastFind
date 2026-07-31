@@ -475,6 +475,7 @@ export function App() {
       {activeNavPlace && (
         <LiveNavigationOverlay
           place={activeNavPlace}
+          userCoords={userCoords}
           onEndNavigation={() => setActiveNavPlace(null)}
           onArrived={() => {
             setAlertNotification(`You have arrived at ${activeNavPlace.name}!`);
