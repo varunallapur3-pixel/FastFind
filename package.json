@@ -1,0 +1,13 @@
+{
+  "name": "findfast-ai-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FindFast AI - High Velocity Local Search & Google Maps Top-Rated Auto-Navigation",
+  "scripts": {
+    "dev:frontend": "npm --prefix frontend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build": "npm run build:frontend && npm run build:backend"
+  }
+}
