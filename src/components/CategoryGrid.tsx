@@ -40,7 +40,6 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
               key={cat.id}
               onClick={() => {
                 onSelectCategory(cat.id);
-                onAutoNavigateCategory(cat.id);
               }}
               className={`glass-card relative flex flex-col justify-between p-4 h-32 rounded-xl group cursor-pointer border transition-all duration-300 ${
                 isSelected

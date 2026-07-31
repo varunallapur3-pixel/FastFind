@@ -35,12 +35,12 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State (Defaults to < 2 KM Radius!)
+  // Search Filter State (Defaults to < 4 KM / 4000m Radius!)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
     minRating: 0,
-    maxDistanceKm: 2, // Default < 2 KM radius
+    maxDistanceKm: 4, // Default < 4 KM / 4000m radius
     openNow: false,
     sortBy: 'rating',
   });
@@ -292,14 +292,6 @@ export function App() {
             {/* Distance Radius Filter Buttons */}
             <div className="flex rounded-lg bg-[#1c1b1b] p-1 border border-white/10">
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 1 }))}
-                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 1 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
-                }`}
-              >
-                &lt; 1 KM
-              </button>
-              <button
                 onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 2 }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
                   filter.maxDistanceKm === 2 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
@@ -308,12 +300,20 @@ export function App() {
                 &lt; 2 KM
               </button>
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 5 }))}
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 4 }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 5 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                  filter.maxDistanceKm === 4 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
                 }`}
               >
-                &lt; 5 KM
+                &lt; 4 KM (4000M)
+              </button>
+              <button
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 10 }))}
+                className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
+                  filter.maxDistanceKm === 10 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                }`}
+              >
+                &lt; 10 KM
               </button>
               <button
                 onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 0 }))}
@@ -423,17 +423,27 @@ export function App() {
                         </div>
                       </div>
 
-                      {/* Title & Ratings */}
-                      <div className="flex justify-between items-start mb-2">
+                      {/* Title, Ratings, Reviews & Open Status */}
+                      <div className="flex justify-between items-start mb-2 gap-2">
                         <div>
                           <h3 className="font-headline font-bold text-xl text-[#e5e2e1] group-hover:text-[#00dbe9] transition-colors">
                             {place.name}
                           </h3>
                           <p className="text-xs font-mono text-[#849495] mt-0.5">{place.address}</p>
                         </div>
-                        <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#a9f900]/10 border border-[#a9f900]/30 text-[#a9f900] font-mono font-bold text-xs">
-                          <Star className="w-3.5 h-3.5 fill-current text-[#a9f900]" />
-                          <span>{place.rating}</span>
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#a9f900]/10 border border-[#a9f900]/30 text-[#a9f900] font-mono font-bold text-xs">
+                            <Star className="w-3.5 h-3.5 fill-current text-[#a9f900]" />
+                            <span>{place.rating}</span>
+                            <span className="text-[#849495] text-[10px]">({place.totalReviews})</span>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold border uppercase ${
+                            place.openStatus
+                              ? 'bg-[#a9f900]/10 text-[#a9f900] border-[#a9f900]/30'
+                              : 'bg-[#ff5252]/10 text-[#ff5252] border-[#ff5252]/30'
+                          }`}>
+                            {place.openStatus ? 'OPEN NOW' : 'CLOSED'}
+                          </span>
                         </div>
                       </div>
 

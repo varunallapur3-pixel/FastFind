@@ -42,9 +42,7 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputValue.trim()) {
-      onAutoNavigateTopRated(inputValue);
-    }
+    onSearch(inputValue);
   };
 
   const handleClear = () => {
@@ -86,16 +84,15 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
           </button>
         )}
 
-        {/* Auto-navigate to top rated trigger button */}
+        {/* Search trigger button */}
         <button
-          type="button"
-          onClick={() => onAutoNavigateTopRated(inputValue || 'all')}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-xs shadow-[0_0_15px_rgba(169,249,0,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
-          title="Auto-Navigate to #1 Top Rated Place"
+          type="submit"
+          className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-xs shadow-[0_0_15px_rgba(0,219,233,0.4)] active:scale-95 transition-all shrink-0 cursor-pointer"
+          title="Search Places Nearby"
         >
-          <Navigation className="w-3.5 h-3.5 fill-current" />
-          <span className="hidden sm:inline">TOP MATCH NAV</span>
-          <span className="sm:hidden">NAV</span>
+          <Search className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">SEARCH NEARBY</span>
+          <span className="sm:hidden">SEARCH</span>
         </button>
 
         {/* Shortcut Badge */}
