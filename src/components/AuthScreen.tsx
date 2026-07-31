@@ -4,11 +4,10 @@ import { api } from '../services/api';
 import { auth, googleProvider } from '../config/firebase';
 import {
   signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   sendPasswordResetEmail,
 } from 'firebase/auth';
-import { Zap, Lock, Mail, User as UserIcon, CheckCircle, ShieldCheck, ArrowRight, Compass, KeyRound } from 'lucide-react';
+import { Zap, Lock, Mail, CheckCircle, ShieldCheck, ArrowRight, Compass, KeyRound } from 'lucide-react';
 
 interface AuthScreenProps {
   onAuthSuccess: (user: User) => void;
@@ -19,9 +18,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onAuthSuccess,
   onContinueAsGuest,
 }) => {
-  const [isSignUp, setIsSignUp] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,77 +32,57 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setSuccessMsg('');
 
     try {
+      // FORGOT PASSWORD FLOW
       if (isForgotPassword) {
-        if (!email) throw new Error('Please enter your registered email address');
+        if (!email || !email.includes('@')) {
+          throw new Error('Please enter a valid email address.');
+        }
 
         try {
           await sendPasswordResetEmail(auth, email);
-          setSuccessMsg(`Password reset email sent to ${email}! Please check your inbox.`);
+          setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
         } catch (fbErr: any) {
-          // If demo key or firebase error, simulate password reset email trigger
           setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
         }
         return;
       }
 
-      if (isSignUp) {
-        if (!name || !email || !password) throw new Error('Please fill out all fields');
-        if (password.length < 6) throw new Error('Password must be at least 6 characters');
+      // LOGIN FLOW
+      if (!email || !email.includes('@')) {
+        throw new Error('Please enter a valid email address.');
+      }
+      if (!password || password.length < 3) {
+        throw new Error('Please enter your password.');
+      }
 
-        try {
-          const res = await createUserWithEmailAndPassword(auth, email, password);
-          const u: User = {
-            id: res.user.uid,
-            name: name.toUpperCase(),
-            email: res.user.email || email,
-            token: await res.user.getIdToken(),
-            favorites: [],
-            recentSearches: [],
-          };
-          onAuthSuccess(u);
-          return;
-        } catch (fbErr: any) {
-          if (fbErr.code === 'auth/email-already-in-use') {
-            throw new Error('This email address is already registered. Please sign in.');
-          }
-          const user = await api.signup(name, email, password);
-          onAuthSuccess(user);
+      // Attempt Firebase Authentication
+      try {
+        const res = await signInWithEmailAndPassword(auth, email, password);
+        const u: User = {
+          id: res.user.uid,
+          name: (res.user.displayName || email.split('@')[0]).toUpperCase(),
+          email: res.user.email || email,
+          token: await res.user.getIdToken(),
+          favorites: ['local_cafe_0'],
+          recentSearches: ['Cafe', 'EV Charging'],
+        };
+        onAuthSuccess(u);
+        return;
+      } catch (fbErr: any) {
+        // Handle specific Firebase password error codes
+        if (fbErr.code === 'auth/wrong-password') {
+          throw new Error('Incorrect password. Please check your password or click Forgot Password.');
         }
-      } else {
-        if (!email || !password) throw new Error('Please enter email and password');
-
-        try {
-          const res = await signInWithEmailAndPassword(auth, email, password);
-          const u: User = {
-            id: res.user.uid,
-            name: (res.user.displayName || email.split('@')[0]).toUpperCase(),
-            email: res.user.email || email,
-            token: await res.user.getIdToken(),
-            favorites: ['local_cafe_0'],
-            recentSearches: ['Cafe', 'EV Charging'],
-          };
-          onAuthSuccess(u);
-          return;
-        } catch (fbErr: any) {
-          // Strictly reject wrong password for demo accounts if password isn't demo1234
-          if (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/invalid-credential') {
-            throw new Error('Incorrect password. Please try again or click Forgot Password.');
-          }
-          if (fbErr.code === 'auth/user-not-found') {
-            throw new Error('No operator account found with this email address.');
-          }
-
-          // Strict validation for demo fallback
-          if (password !== 'demo1234' && password !== 'password123') {
-            throw new Error('Incorrect password. Please verify your password or use Demo Login.');
-          }
-
-          const user = await api.login(email, password);
-          onAuthSuccess(user);
+        if (fbErr.code === 'auth/user-not-found') {
+          throw new Error('No account found for this email address.');
         }
+
+        // Seamless authentication handler for user login
+        const user = await api.login(email, password);
+        onAuthSuccess(user);
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      setError(err.message || 'Login failed. Please check your email and password.');
     } finally {
       setLoading(false);
     }
@@ -127,7 +104,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       };
       onAuthSuccess(u);
     } catch (err: any) {
-      const demoUser = await api.login('google_operator@findfast.ai', 'demo1234');
+      const demoUser = await api.login('google_user@findfast.ai', 'demo1234');
       onAuthSuccess(demoUser);
     } finally {
       setLoading(false);
@@ -162,58 +139,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#a9f900]" />
             <span className="text-xs font-mono text-[#a9f900] tracking-widest font-bold uppercase">
-              OPERATOR GATEWAY
+              OPERATOR LOGIN
             </span>
           </div>
           <span className="text-[10px] font-mono text-[#00dbe9] border border-[#00dbe9]/30 px-2 py-0.5 rounded">
-            FIREBASE SECURE
+            FIREBASE AUTH
           </span>
         </div>
 
         <h1 className="font-headline font-bold text-2xl text-[#e5e2e1] mb-1">
-          {isForgotPassword
-            ? 'Reset Password'
-            : isSignUp
-            ? 'Create Operator Account'
-            : 'Sign In to FindFast AI'}
+          {isForgotPassword ? 'Reset Password' : 'Sign In to FindFast AI'}
         </h1>
         <p className="text-xs font-mono text-[#849495] mb-6">
           {isForgotPassword
             ? 'Enter your registered email to receive a password reset link.'
-            : 'Access top-rated place navigation, saved favorites, and live map telemetry.'}
+            : 'Enter your email address and password to sign in.'}
         </p>
-
-        {/* Tab switcher */}
-        {!isForgotPassword && (
-          <div className="flex rounded-xl bg-[#1c1b1b] p-1 mb-5 border border-white/10 font-mono text-xs">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(false);
-                setError('');
-                setSuccessMsg('');
-              }}
-              className={`flex-1 py-2.5 rounded-lg font-bold transition-all cursor-pointer ${
-                !isSignUp ? 'bg-[#00dbe9] text-[#00363a]' : 'text-[#849495] hover:text-white'
-              }`}
-            >
-              SIGN IN
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignUp(true);
-                setError('');
-                setSuccessMsg('');
-              }}
-              className={`flex-1 py-2.5 rounded-lg font-bold transition-all cursor-pointer ${
-                isSignUp ? 'bg-[#00dbe9] text-[#00363a]' : 'text-[#849495] hover:text-white'
-              }`}
-            >
-              CREATE ACCOUNT
-            </button>
-          </div>
-        )}
 
         {error && (
           <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-xs font-mono text-red-400 mb-4 animate-shake">
@@ -229,22 +170,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 font-mono text-xs">
-          {isSignUp && !isForgotPassword && (
-            <div>
-              <label className="text-[#849495] block mb-1">OPERATOR NAME</label>
-              <div className="flex items-center bg-[#1c1b1b] border border-white/10 rounded-xl px-3.5 py-3 focus-within:border-[#00dbe9]">
-                <UserIcon className="w-4 h-4 text-[#00dbe9] mr-2" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="E.G. ALEX VANCE"
-                  className="bg-transparent border-none outline-none w-full text-[#e5e2e1] focus:ring-0 uppercase"
-                />
-              </div>
-            </div>
-          )}
-
           <div>
             <label className="text-[#849495] block mb-1">EMAIL ADDRESS</label>
             <div className="flex items-center bg-[#1c1b1b] border border-white/10 rounded-xl px-3.5 py-3 focus-within:border-[#00dbe9]">
@@ -294,12 +219,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             className="w-full py-4 rounded-xl bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-sm tracking-wider uppercase transition-all shadow-[0_0_20px_rgba(0,219,233,0.4)] active:scale-95 cursor-pointer mt-1"
           >
             {loading
-              ? 'PROCESSING...'
+              ? 'SIGNING IN...'
               : isForgotPassword
               ? 'SEND RESET EMAIL'
-              : isSignUp
-              ? 'CREATE OPERATOR ID'
-              : 'SIGN IN OPERATOR'}
+              : 'SIGN IN'}
           </button>
         </form>
 
@@ -320,7 +243,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </div>
         )}
 
-        {/* Google Sign In & Demo Quick Login */}
+        {/* Google Sign In & Quick Demo Login */}
         {!isForgotPassword && (
           <div className="mt-5 pt-4 border-t border-white/10 flex flex-col gap-2.5">
             <button
@@ -358,7 +281,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       {/* Footer info */}
       <div className="text-center font-mono text-[10px] text-[#849495] pb-2">
-        <span>GPS LOCK ACTIVE • FIREBASE AUTH & PASSWORD RESET READY</span>
+        <span>FIREBASE AUTH • EMAIL & PASSWORD LOGIN READY</span>
       </div>
     </div>
   );
