@@ -9,13 +9,16 @@ import { InteractiveMap } from './components/InteractiveMap';
 import { LiveNavigationOverlay } from './components/LiveNavigationOverlay';
 import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
+import { AuthScreen } from './components/AuthScreen';
 import { BottomHUD } from './components/BottomHUD';
 import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink } from 'lucide-react';
 
 export function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [hasStarted, setHasStarted] = useState(false); // Controls start landing screen vs main app
+
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
 
   // View States
   const [activeView, setActiveView] = useState<ActiveView>('home');
@@ -32,7 +35,7 @@ export function App() {
     category: 'all',
     minRating: 0,
     openNow: false,
-    sortBy: 'rating', // default highest rated first!
+    sortBy: 'rating',
   });
 
   // Fetch places based on filter
@@ -49,10 +52,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    fetchPlaces(filter);
-  }, [filter, fetchPlaces]);
+    if (hasStarted) {
+      fetchPlaces(filter);
+    }
+  }, [filter, fetchPlaces, hasStarted]);
 
-  // Handle Search Input Change - Keeps input focus persistent!
+  // Handle Search Input Change
   const handleSearch = (query: string) => {
     setFilter((prev) => ({ ...prev, query }));
   };
@@ -85,6 +90,22 @@ export function App() {
     setFavorites(updated);
   };
 
+  // Render Start Auth Landing Screen first
+  if (!hasStarted && !user) {
+    return (
+      <AuthScreen
+        onAuthSuccess={(authenticatedUser) => {
+          setUser(authenticatedUser);
+          setHasStarted(true);
+          setAlertNotification(`Welcome back, ${authenticatedUser.name}!`);
+        }}
+        onContinueAsGuest={() => {
+          setHasStarted(true);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="relative min-h-screen bg-[#050505] text-[#e5e2e1] pb-32 pt-20">
       {/* Background Scanline */}
@@ -94,7 +115,10 @@ export function App() {
       <Navbar
         user={user}
         onOpenAuth={() => setShowAuthModal(true)}
-        onLogout={() => setUser(null)}
+        onLogout={() => {
+          setUser(null);
+          setHasStarted(false);
+        }}
         onGoHome={() => {
           setActiveView('home');
           setFilter({ query: '', category: 'all', minRating: 0, openNow: false, sortBy: 'rating' });
@@ -111,7 +135,7 @@ export function App() {
             <span className="flex items-center gap-2">
               <Zap className="w-4 h-4 text-[#a9f900]" /> {alertNotification}
             </span>
-            <button onClick={() => setAlertNotification(null)} className="text-white hover:underline">
+            <button onClick={() => setAlertNotification(null)} className="text-white hover:underline cursor-pointer">
               DISMISS
             </button>
           </div>
@@ -137,7 +161,7 @@ export function App() {
             </div>
           </div>
 
-          {/* Search HUD Input - ALWAYS VISIBLE TO PREVENT TYPING DISRUPTION */}
+          {/* Search HUD Input */}
           <SearchHUD
             onSearch={handleSearch}
             currentQuery={filter.query}
@@ -146,7 +170,7 @@ export function App() {
             onAutoNavigateTopRated={handleAutoNavigateTopRated}
           />
 
-          {/* Category Bento Grid - ALWAYS VISIBLE */}
+          {/* Category Bento Grid */}
           <CategoryGrid
             selectedCategory={filter.category}
             onSelectCategory={handleSelectCategory}
