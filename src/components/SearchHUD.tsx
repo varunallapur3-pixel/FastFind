@@ -20,9 +20,13 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
   const [inputValue, setInputValue] = useState(currentQuery);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Debounce search handler (300ms)
   useEffect(() => {
-    setInputValue(currentQuery);
-  }, [currentQuery]);
+    const timer = setTimeout(() => {
+      onSearch(inputValue);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [inputValue, onSearch]);
 
   // Global CMD+K shortcut to focus search input
   useEffect(() => {
@@ -66,9 +70,7 @@ export const SearchHUD: React.FC<SearchHUDProps> = ({
           type="text"
           value={inputValue}
           onChange={(e) => {
-            const val = e.target.value;
-            setInputValue(val);
-            onSearch(val);
+            setInputValue(e.target.value);
           }}
           placeholder="SEARCH ANY PLACE (e.g. 'Cafe', 'Dentist', 'EV Charging')..."
           className="bg-transparent border-none outline-none w-full font-mono text-sm text-[#00dbe9] placeholder:text-[#849495] focus:ring-0 uppercase tracking-wide"

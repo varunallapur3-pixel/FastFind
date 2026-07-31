@@ -1,25 +1,32 @@
 import React from 'react';
-import { ActiveView } from '../types';
+import { ActiveView, Coords } from '../types';
 import { Search, Compass, Heart, Bell, User as UserIcon } from 'lucide-react';
 
 interface BottomHUDProps {
   activeView: ActiveView;
   onChangeView: (view: ActiveView) => void;
   favoritesCount: number;
+  userCoords?: Coords;
+  locationLabel?: string;
 }
 
 export const BottomHUD: React.FC<BottomHUDProps> = ({
   activeView,
   onChangeView,
   favoritesCount,
+  userCoords,
+  locationLabel,
 }) => {
   return (
     <footer className="fixed bottom-0 left-0 w-full z-40">
       {/* Status Bar */}
-      <div className="w-full h-7 bg-[#0a0a0a]/90 backdrop-blur-md flex items-center justify-center border-t border-white/5 font-mono text-[10px] text-[#a9f900] tracking-widest">
+      <div className="w-full h-7 bg-[#0a0a0a]/90 backdrop-blur-md flex items-center justify-center border-t border-white/5 font-mono text-[10px] text-[#a9f900] tracking-widest uppercase">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-[#a9f900] pulse-green" />
-          <span>GPS LOCKED: DOWNTOWN CORE (LAT 37.7749, LNG -122.4194)</span>
+          <span>
+            GPS LOCKED: {locationLabel || 'LIVE POSITION'}{' '}
+            {userCoords ? `(LAT ${userCoords.lat.toFixed(4)}, LNG ${userCoords.lng.toFixed(4)})` : ''}
+          </span>
         </div>
       </div>
 

@@ -1,3 +1,5 @@
+import { GPSLocationDetails } from '../types';
+
 /**
  * Known Indian city coordinates lookup for instant location switching
  */
@@ -45,8 +47,9 @@ function deg2rad(deg: number): number {
 
 /**
  * Get user's current exact GPS location via browser Geolocation API
+ * Retrieves latitude, longitude, accuracy, and timestamp.
  */
-export function getUserLocation(): Promise<{ lat: number; lng: number }> {
+export function getUserLocation(): Promise<GPSLocationDetails> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser'));
@@ -58,6 +61,8 @@ export function getUserLocation(): Promise<{ lat: number; lng: number }> {
         resolve({
           lat: position.coords.latitude,
           lng: position.coords.longitude,
+          accuracy: position.coords.accuracy,
+          timestamp: position.timestamp,
         });
       },
       (error) => {

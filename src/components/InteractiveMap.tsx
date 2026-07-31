@@ -15,7 +15,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   selectedPlace,
   onSelectPlace,
   onStartNavigation,
-  userCoords = { lat: 37.7749, lng: -122.4194 },
+  userCoords = { lat: 16.8302, lng: 75.7100 },
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
@@ -45,12 +45,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       leafletMap.current = map;
       markersGroup.current = L.layerGroup().addTo(map);
+    } else {
+      leafletMap.current.panTo([userCoords.lat, userCoords.lng]);
     }
-
-    return () => {
-      // Keep map persistent across small rerenders
-    };
-  }, []);
+  }, [userCoords]);
 
   // Update Markers & Polyline
   useEffect(() => {

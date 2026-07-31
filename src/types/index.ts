@@ -11,7 +11,11 @@ export type CategoryId =
   | 'car_wash'
   | 'mechanic'
   | 'hotel'
-  | 'restaurant';
+  | 'restaurant'
+  | 'grocery'
+  | 'bakery'
+  | 'medical_store'
+  | 'veterinary';
 
 export interface Category {
   id: CategoryId;
@@ -24,6 +28,11 @@ export interface Category {
 export interface Coords {
   lat: number;
   lng: number;
+}
+
+export interface GPSLocationDetails extends Coords {
+  accuracy?: number;
+  timestamp?: number;
 }
 
 export interface Review {

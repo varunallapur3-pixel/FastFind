@@ -49,16 +49,15 @@ export function App() {
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
     try {
-      const coords = await getUserLocation();
-      setUserCoords(coords);
+      const details = await getUserLocation();
+      setUserCoords({ lat: details.lat, lng: details.lng });
       setLocationLabel('Your Exact GPS Location');
       setGpsStatus('locked');
-      setAlertNotification(`📍 Live GPS Locked to your device (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
+      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within 2km`);
       setTimeout(() => setAlertNotification(null), 4000);
-    } catch (err) {
-      setUserCoords({ lat: 16.8302, lng: 75.7100 });
-      setLocationLabel('Vijayapura');
+    } catch (err: any) {
       setGpsStatus('manual');
+      setAlertNotification('⚠️ Browser location permission required. Click "GRANT / RE-SYNC GPS" to enable live nearby search.');
     }
   }, []);
 
@@ -167,7 +166,7 @@ export function App() {
         }}
         onGoHome={() => {
           setActiveView('home');
-          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 1, openNow: false, sortBy: 'rating' });
+          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 2, openNow: false, sortBy: 'rating' });
         }}
         onOpenFavorites={() => setActiveView('favorites')}
         favoritesCount={favorites.length}
@@ -541,6 +540,8 @@ export function App() {
           }
         }}
         favoritesCount={favorites.length}
+        userCoords={userCoords}
+        locationLabel={locationLabel}
       />
     </div>
   );
