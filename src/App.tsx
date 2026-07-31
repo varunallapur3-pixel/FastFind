@@ -35,12 +35,12 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State (Defaults to < 1 KM Radius!)
+  // Search Filter State (Defaults to < 2 KM Radius!)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
     minRating: 0,
-    maxDistanceKm: 1, // Default < 1 KM radius
+    maxDistanceKm: 2, // Default < 2 KM radius
     openNow: false,
     sortBy: 'rating',
   });
@@ -112,7 +112,7 @@ export function App() {
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
-      setAlertNotification('No top match found within 1km radius.');
+      setAlertNotification('No top match found within 2km radius.');
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
@@ -354,7 +354,7 @@ export function App() {
             <h2 className="text-[#b9cacb] uppercase tracking-wider">
               {activeView === 'favorites'
                 ? `SAVED FAVORITE PLACES (${places.filter((p) => favorites.includes(p.id)).length})`
-                : `HIGHEST RATED PLACES WITHIN 1KM RADIUS (${places.length} FOUND)`}
+                : `${Boolean(filter.maxDistanceKm && filter.maxDistanceKm > 0) ? `HIGHEST RATED PLACES WITHIN ${filter.maxDistanceKm}KM RADIUS` : 'ALL HIGHEST RATED PLACES'} (${places.length} FOUND)`}
             </h2>
             <span className="text-[#00dbe9]">AUTO-SORT: HIGHEST RATING FIRST</span>
           </div>

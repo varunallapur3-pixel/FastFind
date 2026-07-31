@@ -225,7 +225,7 @@ export const api = {
   },
 
   /**
-   * Get top rated place strictly under 1.5km radius from user's live GPS
+   * Get top rated place strictly under 2.0km radius from user's live GPS
    */
   async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords, locationLabel?: string): Promise<Place | null> {
     const allMatches = await this.searchPlaces(
@@ -233,7 +233,7 @@ export const api = {
         query: queryOrCategory,
         category: 'all',
         minRating: 0,
-        maxDistanceKm: 1.5, // STRICTLY UNDER 1.5 KM FOR TOP MATCH!
+        maxDistanceKm: 2.0, // STRICTLY UNDER 2.0 KM FOR TOP MATCH!
         openNow: false,
         sortBy: 'rating',
       },
