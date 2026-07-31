@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Place } from '../types';
+import { Place, Coords } from '../types';
 import { getGoogleMapsDirUrl } from '../utils/geo';
 import { Navigation, Star, MapPin, Clock, X, Zap, ExternalLink, ShieldCheck } from 'lucide-react';
 
 interface AutoNavigateModalProps {
   place: Place;
+  userCoords?: Coords;
   onClose: () => void;
   onStartInAppNavigation: (place: Place) => void;
   onViewDetails: (place: Place) => void;
@@ -12,6 +13,7 @@ interface AutoNavigateModalProps {
 
 export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
   place,
+  userCoords,
   onClose,
   onStartInAppNavigation,
   onViewDetails,
@@ -20,7 +22,14 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
   const [autoNavActive, setAutoNavActive] = useState(true);
 
   const openGoogleMapsNav = () => {
-    const url = getGoogleMapsDirUrl(place.name, place.address, place.coords.lat, place.coords.lng);
+    const url = getGoogleMapsDirUrl(
+      place.name,
+      place.address,
+      place.coords.lat,
+      place.coords.lng,
+      userCoords?.lat,
+      userCoords?.lng
+    );
     window.open(url, '_blank');
   };
 

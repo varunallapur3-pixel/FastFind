@@ -84,12 +84,29 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  const destParam = `${destLat},${destLng}`;
   const originParam =
     userLat !== undefined && userLng !== undefined
       ? `${userLat},${userLng}`
       : 'My+Location';
 
-  // Do NOT pass text or lat/lng to destination_place_id as Google Maps URL API requires an actual Google Place ID hash.
+  // Clean place name and address from internal UI suffixes
+  const cleanName = (destinationName || '')
+    .replace(/\(Your Exact GPS Location\)/gi, '')
+    .replace(/\([^)]*\)/g, '')
+    .trim();
+
+  const cleanAddress = (destinationAddress || '')
+    .replace(/Your Exact GPS Location/gi, '')
+    .replace(/\([^)]*\)/g, '')
+    .trim();
+
+  let targetQuery = cleanName;
+  if (cleanAddress && !cleanName.toLowerCase().includes(cleanAddress.toLowerCase())) {
+    targetQuery = `${cleanName}, ${cleanAddress}`;
+  }
+
+  // Prefer clean place name & address query for Google Maps, fallback to lat,lng coordinates
+  const destParam = targetQuery ? encodeURIComponent(targetQuery) : `${destLat},${destLng}`;
+
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
 }

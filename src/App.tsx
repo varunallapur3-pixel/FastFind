@@ -476,6 +476,7 @@ export function App() {
       {autoNavPlace && (
         <AutoNavigateModal
           place={autoNavPlace}
+          userCoords={userCoords}
           onClose={() => setAutoNavPlace(null)}
           onStartInAppNavigation={(p) => {
             setAutoNavPlace(null);
@@ -492,6 +493,7 @@ export function App() {
       {selectedPlace && (
         <PlaceDetailModal
           place={selectedPlace}
+          userCoords={userCoords}
           isFavorite={favorites.includes(selectedPlace.id)}
           onClose={() => setSelectedPlace(null)}
           onToggleFavorite={handleToggleFavorite}
