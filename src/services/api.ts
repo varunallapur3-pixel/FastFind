@@ -142,6 +142,11 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'Y
     const actualDistKm = calculateDistanceKm(userCoords.lat, userCoords.lng, placeLat, placeLng);
     const actualDistMiles = calculateDistanceMiles(userCoords.lat, userCoords.lng, placeLat, placeLng);
 
+    const cityLabel =
+      locationLabel && !locationLabel.toLowerCase().includes('gps location')
+        ? locationLabel
+        : 'Nearby';
+
     return {
       id: `nearby_${tmpl.cat}_${idx}`,
       name: tmpl.name,
@@ -152,7 +157,7 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'Y
       distanceKm: actualDistKm,
       distanceMiles: actualDistMiles,
       durationMins: Math.max(1, Math.round(actualDistKm * 2)),
-      address: `${tmpl.street}, ${locationLabel}`,
+      address: `${tmpl.street}, ${cityLabel}`,
       phone: '+91 98450 12345',
       website: 'https://maps.google.com',
       openStatus: true,

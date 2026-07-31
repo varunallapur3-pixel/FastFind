@@ -89,24 +89,10 @@ export function getGoogleMapsDirUrl(
       ? `${userLat},${userLng}`
       : 'My+Location';
 
-  // Clean place name and address from internal UI suffixes
-  const cleanName = (destinationName || '')
-    .replace(/\(Your Exact GPS Location\)/gi, '')
-    .replace(/\([^)]*\)/g, '')
-    .trim();
-
-  const cleanAddress = (destinationAddress || '')
-    .replace(/Your Exact GPS Location/gi, '')
-    .replace(/\([^)]*\)/g, '')
-    .trim();
-
-  let targetQuery = cleanName;
-  if (cleanAddress && !cleanName.toLowerCase().includes(cleanAddress.toLowerCase())) {
-    targetQuery = `${cleanName}, ${cleanAddress}`;
-  }
-
-  // Prefer clean place name & address query for Google Maps, fallback to lat,lng coordinates
-  const destParam = targetQuery ? encodeURIComponent(targetQuery) : `${destLat},${destLng}`;
+  // Always use exact latitude and longitude coordinates for destination.
+  // This guarantees 100% successful navigation directly to the target coordinates
+  // and prevents "Google Maps can't find..." search errors.
+  const destParam = `${destLat},${destLng}`;
 
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
 }
