@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Place, NavigationStep, Coords } from '../types';
 import { getGoogleMapsDirUrl } from '../utils/geo';
 import L from 'leaflet';
-import { Navigation, ArrowUp, Flag, X, Volume2, Gauge, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Navigation, ArrowUp, X, Volume2, Gauge, ExternalLink, ShieldCheck } from 'lucide-react';
 
 interface LiveNavigationOverlayProps {
   place: Place;
@@ -36,21 +36,21 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
     {
       id: 1,
       instruction: `Head towards ${place.name} (${place.address})`,
-      distance: `${place.distanceKm || 0.8} km`,
-      duration: `${place.durationMins || 3} min`,
+      distance: `${place.distanceKm || 0.2} km`,
+      duration: `${place.durationMins || 1} min`,
       icon: 'arrow-up',
     },
     {
       id: 2,
       instruction: `Turn onto ${place.address}`,
-      distance: '200 m',
+      distance: '100 m',
       duration: '30 sec',
       icon: 'corner-right',
     },
     {
       id: 3,
       instruction: `Arrive at ${place.name}`,
-      distance: '50 m',
+      distance: '30 m',
       duration: '10 sec',
       icon: 'flag',
     },
@@ -63,13 +63,15 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
     if (!leafletMap.current) {
       const map = L.map(mapRef.current, {
         center: [userCoords.lat, userCoords.lng],
-        zoom: 15,
+        zoom: 16,
         zoomControl: false,
       });
 
+      // CartoDB Dark Tiles Layer
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; CARTO',
+        attribution: '&copy; CARTO &copy; OpenStreetMap',
         maxZoom: 19,
+        subdomains: 'abcd',
       }).addTo(map);
 
       // User Position Marker
@@ -105,18 +107,22 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
         ],
         {
           color: '#a9f900',
-          weight: 5,
-          opacity: 0.9,
-          dashArray: '10, 10',
+          weight: 6,
+          opacity: 0.95,
+          dashArray: '8, 8',
         }
       ).addTo(map);
 
-      // Fit bounds
+      // Fit bounds and force resize calculation
       const bounds = L.latLngBounds([
         [userCoords.lat, userCoords.lng],
         [place.coords.lat, place.coords.lng],
       ]);
-      map.fitBounds(bounds, { padding: [40, 40] });
+      map.fitBounds(bounds, { padding: [50, 50] });
+
+      setTimeout(() => {
+        map.invalidateSize();
+      }, 150);
 
       leafletMap.current = map;
     }
@@ -175,7 +181,7 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
 
           <button
             onClick={() => alert(`Audio turn guidance enabled for ${place.name}`)}
-            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-[#00dbe9] border border-white/10"
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-[#00dbe9] border border-white/10 cursor-pointer"
             title="Audio Guidance"
           >
             <Volume2 className="w-5 h-5" />
@@ -191,11 +197,11 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
       </div>
 
       {/* Middle Interactive Leaflet Map HUD */}
-      <div className="relative flex-1 my-4 rounded-2xl overflow-hidden glass-card border border-[#00dbe9]/30">
+      <div className="relative flex-1 my-4 rounded-2xl overflow-hidden glass-card border border-[#00dbe9]/30 bg-[#0d1117]">
         <div className="scanline" />
 
         {/* Real Leaflet Map Container */}
-        <div ref={mapRef} className="w-full h-full" />
+        <div ref={mapRef} className="w-full h-full bg-[#0d1117]" />
 
         {/* Speedometer Overlay */}
         <div className="absolute top-4 left-4 z-[400] flex items-center gap-3 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
@@ -228,7 +234,7 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
           <div className="flex justify-between text-[10px] font-mono text-[#849495]">
             <span>START</span>
             <span className="text-[#a9f900] font-bold">{progressPercent}% COMPLETED</span>
-            <span>{place.durationMins || 3} MINS</span>
+            <span>{place.durationMins || 1} MINS</span>
           </div>
         </div>
       </div>
