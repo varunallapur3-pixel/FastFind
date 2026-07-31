@@ -35,12 +35,12 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>(['local_cafe_0', 'local_restaurant_9']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State
+  // Search Filter State (Defaults to < 1 KM Radius!)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
     minRating: 0,
-    maxDistanceKm: 0, // 0 = all
+    maxDistanceKm: 1, // Default < 1 KM radius
     openNow: false,
     sortBy: 'rating',
   });
