@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Place, CategoryId, User, ActiveView, SearchFilter, Coords } from './types';
 import { api } from './services/api';
-import { getUserLocation, getGoogleMapsDirUrl } from './utils/geo';
+import { getUserLocation, getGoogleMapsDirUrl, CITY_COORDS } from './utils/geo';
 import { Navbar } from './components/Navbar';
 import { SearchHUD } from './components/SearchHUD';
 import { CategoryGrid } from './components/CategoryGrid';
@@ -12,15 +12,16 @@ import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BottomHUD } from './components/BottomHUD';
-import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate, CheckCircle } from 'lucide-react';
+import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate } from 'lucide-react';
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // User Live GPS Coords
-  const [userCoords, setUserCoords] = useState<Coords>({ lat: 37.7749, lng: -122.4194 });
-  const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'default'>('requesting');
+  // User Live GPS Coords (Default: Vijayapura, Karnataka)
+  const [userCoords, setUserCoords] = useState<Coords>({ lat: 16.8302, lng: 75.7100 });
+  const [currentCityName, setCurrentCityName] = useState<string>('Vijayapura, Karnataka');
+  const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'manual'>('requesting');
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ export function App() {
   const [autoNavPlace, setAutoNavPlace] = useState<Place | null>(null);
   const [activeNavPlace, setActiveNavPlace] = useState<Place | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(['neon-roast', 'cyber-bistro']);
+  const [favorites, setFavorites] = useState<string[]>(['local_cafe_0', 'local_restaurant_9']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
   // Search Filter State
@@ -44,18 +45,21 @@ export function App() {
     sortBy: 'rating',
   });
 
-  // Fetch real-time GPS location on app startup
+  // Request browser GPS location
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
     try {
       const coords = await getUserLocation();
       setUserCoords(coords);
+      setCurrentCityName('Your Live GPS Location');
       setGpsStatus('locked');
-      setAlertNotification(`GPS Locked to your exact location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
+      setAlertNotification(`GPS Locked to your location (${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)})`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err) {
-      console.warn('Geolocation fallback to default', err);
-      setGpsStatus('default');
+      // Fallback to Vijayapura
+      setUserCoords({ lat: 16.8302, lng: 75.7100 });
+      setCurrentCityName('Vijayapura, Karnataka');
+      setGpsStatus('manual');
     }
   }, []);
 
@@ -63,11 +67,23 @@ export function App() {
     requestGPSLocation();
   }, [requestGPSLocation]);
 
+  // Handle City Change
+  const handleCitySelect = (cityKey: string) => {
+    const city = CITY_COORDS[cityKey];
+    if (city) {
+      setUserCoords({ lat: city.lat, lng: city.lng });
+      setCurrentCityName(city.name);
+      setGpsStatus('manual');
+      setAlertNotification(`Location set to ${city.name}`);
+      setTimeout(() => setAlertNotification(null), 3000);
+    }
+  };
+
   // Fetch places based on filter & userCoords
-  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords) => {
+  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords, city: string) => {
     setLoading(true);
     try {
-      const results = await api.searchPlaces(currentFilter, coords);
+      const results = await api.searchPlaces(currentFilter, coords, city);
       setPlaces(results);
     } catch (err) {
       console.error('Search places error', err);
@@ -78,9 +94,9 @@ export function App() {
 
   useEffect(() => {
     if (hasStarted) {
-      fetchPlaces(filter, userCoords);
+      fetchPlaces(filter, userCoords, currentCityName);
     }
-  }, [filter, userCoords, fetchPlaces, hasStarted]);
+  }, [filter, userCoords, currentCityName, fetchPlaces, hasStarted]);
 
   // Handle Search Input Change
   const handleSearch = (query: string) => {
@@ -93,7 +109,7 @@ export function App() {
   };
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
-    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords);
+    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, currentCityName);
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
@@ -172,23 +188,39 @@ export function App() {
           </div>
         )}
 
-        {/* GPS LIVE LOCATION STATUS HUD BAR */}
-        <section className="mb-6 p-3 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
+        {/* GPS LIVE LOCATION & CITY SELECTOR HUD BAR */}
+        <section className="mb-6 p-3.5 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2">
             <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-[#00dbe9]'}`} />
-            <span className="text-[#849495] uppercase">CURRENT GPS LOCATION:</span>
+            <span className="text-[#849495] uppercase">CURRENT LOCATION:</span>
             <span className="text-[#00dbe9] font-bold">
-              {gpsStatus === 'locked' ? `${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)}` : 'APPROXIMATE PERIMETER'}
+              {currentCityName} ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})
             </span>
           </div>
 
-          <button
-            onClick={requestGPSLocation}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00dbe9]/10 text-[#00dbe9] border border-[#00dbe9]/30 hover:bg-[#00dbe9] hover:text-[#00363a] transition-all cursor-pointer font-bold"
-          >
-            <Locate className="w-3.5 h-3.5" />
-            <span>RE-SYNC GPS LOCATION</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Quick City Switcher Dropdown */}
+            <select
+              onChange={(e) => handleCitySelect(e.target.value)}
+              className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer"
+              defaultValue="vijayapura"
+            >
+              <option value="vijayapura">Vijayapura</option>
+              <option value="bengaluru">Bengaluru</option>
+              <option value="hyderabad">Hyderabad</option>
+              <option value="mumbai">Mumbai</option>
+              <option value="delhi">New Delhi</option>
+              <option value="pune">Pune</option>
+            </select>
+
+            <button
+              onClick={requestGPSLocation}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#00dbe9]/10 text-[#00dbe9] border border-[#00dbe9]/30 hover:bg-[#00dbe9] hover:text-[#00363a] transition-all cursor-pointer font-bold"
+            >
+              <Locate className="w-3.5 h-3.5" />
+              <span>LIVE GPS</span>
+            </button>
+          </div>
         </section>
 
         {/* HERO HEADER & PERSISTENT SEARCH HUD */}
@@ -207,7 +239,7 @@ export function App() {
             {/* Quick Mode Pill */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1c1b1b] border border-[#a9f900]/30 font-mono text-xs text-[#a9f900] shrink-0">
               <Shield className="w-4 h-4 text-[#a9f900]" />
-              <span>LIVE GPS GOOGLE MAPS NAVIGATION</span>
+              <span>LOCALIZED NAV: {currentCityName.toUpperCase()}</span>
             </div>
           </div>
 
@@ -233,7 +265,7 @@ export function App() {
           <div className="flex items-center justify-between mb-3 font-mono text-xs">
             <h3 className="text-[#849495] uppercase tracking-wider flex items-center gap-2">
               <MapPin className="w-4 h-4 text-[#00dbe9]" />
-              <span>GEOSPATIAL MAP HUD (ORIGIN: YOUR GPS POSITION)</span>
+              <span>GEOSPATIAL MAP HUD (ORIGIN: {currentCityName.toUpperCase()})</span>
             </h3>
             {selectedPlace && (
               <span className="text-[#a9f900]">
@@ -323,14 +355,14 @@ export function App() {
             <h2 className="text-[#b9cacb] uppercase tracking-wider">
               {activeView === 'favorites'
                 ? `SAVED FAVORITE PLACES (${places.filter((p) => favorites.includes(p.id)).length})`
-                : `INTELLIGENTLY RANKED PLACES NEARBY (${places.length} FOUND)`}
+                : `INTELLIGENTLY RANKED PLACES NEAR ${currentCityName.toUpperCase()} (${places.length} FOUND)`}
             </h2>
             <span className="text-[#00dbe9]">AUTO-SORT: HIGHEST RATING FIRST</span>
           </div>
 
           {loading ? (
             <div className="py-16 text-center font-mono text-sm text-[#00dbe9] animate-pulse">
-              CALCULATING DISTANCE & RATING FROM YOUR GPS LOCATION...
+              CALCULATING DISTANCE & RATING FROM YOUR LOCATION...
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -418,7 +450,7 @@ export function App() {
                       <button
                         onClick={() => openGoogleMapsNav(place)}
                         className="flex items-center justify-center gap-1 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-xs py-3 rounded-xl shadow-[0_0_15px_rgba(169,249,0,0.3)] active:scale-95 transition-all cursor-pointer"
-                        title="Open direct turn-by-turn navigation in Google Maps from your current location"
+                        title="Open direct turn-by-turn navigation in Google Maps from your location"
                       >
                         <Navigation className="w-3.5 h-3.5 fill-current" />
                         <span>GOOGLE MAPS</span>

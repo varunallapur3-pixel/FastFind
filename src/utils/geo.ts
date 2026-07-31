@@ -1,4 +1,16 @@
 /**
+ * Known Indian city coordinates lookup for instant location switching
+ */
+export const CITY_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
+  vijayapura: { lat: 16.8302, lng: 75.7100, name: 'Vijayapura, Karnataka' },
+  bengaluru: { lat: 12.9716, lng: 77.5946, name: 'Bengaluru, Karnataka' },
+  hyderabad: { lat: 17.3850, lng: 78.4867, name: 'Hyderabad, Telangana' },
+  mumbai: { lat: 19.0760, lng: 72.8777, name: 'Mumbai, Maharashtra' },
+  delhi: { lat: 28.6139, lng: 77.2090, name: 'New Delhi, Delhi' },
+  pune: { lat: 18.5204, lng: 73.8567, name: 'Pune, Maharashtra' },
+};
+
+/**
  * Calculate distance between two lat/lng coordinates in kilometers (Haversine formula)
  */
 export function calculateDistanceKm(
@@ -14,7 +26,7 @@ export function calculateDistanceKm(
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return Math.round(R * c * 10) / 10; // Rounded to 1 decimal place
+  return Math.round(R * c * 10) / 10;
 }
 
 export function calculateDistanceMiles(
@@ -61,7 +73,8 @@ export function getUserLocation(): Promise<{ lat: number; lng: number }> {
 }
 
 /**
- * Generate accurate Google Maps direction URL from current user location to destination
+ * Generate Google Maps direction URL that forces device's live current location ("My Location")
+ * or exact user coordinates directly to the place!
  */
 export function getGoogleMapsDirUrl(
   destinationName: string,
@@ -73,10 +86,12 @@ export function getGoogleMapsDirUrl(
 ): string {
   const destQuery = encodeURIComponent(`${destinationName}, ${destinationAddress}`);
   
-  let originParam = 'My+Location';
+  // Format destination coordinates
+  const destCoords = `${destLat},${destLng}`;
+
   if (userLat && userLng) {
-    originParam = `${userLat},${userLng}`;
+    return `https://www.google.com/maps/dir/${userLat},${userLng}/${destCoords}/@${destLat},${destLng},15z/data=!3m1!4b1!4m2!4m1!3e0`;
   }
 
-  return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destQuery}&destination_place_id=${destLat},${destLng}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/My+Location/${destQuery}/@${destLat},${destLng},15z/data=!3m1!4b1!4m2!4m1!3e0`;
 }

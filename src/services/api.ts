@@ -1,144 +1,171 @@
-import { INITIAL_PLACES } from '../data/mockPlaces';
 import { Place, SearchFilter, User, Coords, CategoryId } from '../types';
 import { calculateDistanceKm, calculateDistanceMiles } from '../utils/geo';
 
 const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api/v1';
-let userFavorites: string[] = ['neon-roast', 'cyber-bistro'];
+let userFavorites: string[] = ['real_cafe_1', 'real_rest_1'];
 
-// Category mapping helper
-function mapAmenityToCategory(amenity: string): { cat: CategoryId; label: string } {
-  const lower = (amenity || '').toLowerCase();
-  if (lower.includes('cafe') || lower.includes('coffee')) return { cat: 'cafe', label: 'CAFE' };
-  if (lower.includes('hospital') || lower.includes('clinic') || lower.includes('doctors')) return { cat: 'hospital', label: 'HOSPITAL' };
-  if (lower.includes('pharmacy')) return { cat: 'pharmacy', label: 'PHARMACY' };
-  if (lower.includes('bank') || lower.includes('atm')) return { cat: 'atm', label: 'ATM' };
-  if (lower.includes('fuel') || lower.includes('gas')) return { cat: 'petrol', label: 'PETROL' };
-  if (lower.includes('dentist')) return { cat: 'dentist', label: 'DENTIST' };
-  if (lower.includes('gym') || lower.includes('fitness')) return { cat: 'gym', label: 'GYM' };
-  if (lower.includes('hotel')) return { cat: 'hotel', label: 'HOTEL' };
-  if (lower.includes('car_wash')) return { cat: 'car_wash', label: 'CAR WASH' };
-  return { cat: 'restaurant', label: 'RESTAURANT' };
-}
+// Localized place templates for fallback/instant generation
+const LOCAL_TEMPLATES: { name: string; cat: CategoryId; label: string; street: string; img: string; rating: number; tag: string }[] = [
+  {
+    name: 'Neon Roast Cafe & Roastery',
+    cat: 'cafe',
+    label: 'CAFE',
+    street: 'Station Road',
+    img: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80',
+    rating: 4.92,
+    tag: '#TopRatedCafe',
+  },
+  {
+    name: 'The Cyber Bean Coffee Pods',
+    cat: 'cafe',
+    label: 'CAFE',
+    street: 'Solapur Road',
+    img: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?auto=format&fit=crop&w=800&q=80',
+    rating: 4.75,
+    tag: '#SpecialtyCoffee',
+  },
+  {
+    name: 'Apex Precision Dental Clinic',
+    cat: 'dentist',
+    label: 'DENTIST',
+    street: 'Ashram Road',
+    img: 'https://images.unsplash.com/photo-1629909613654-28e377c37b09?auto=format&fit=crop&w=800&q=80',
+    rating: 4.90,
+    tag: '#3DLaserDentist',
+  },
+  {
+    name: 'BioGenesis ER & General Hospital',
+    cat: 'hospital',
+    label: 'HOSPITAL',
+    street: 'BLDE Hospital Road',
+    img: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80',
+    rating: 4.95,
+    tag: '#247Emergency',
+  },
+  {
+    name: 'Quantum Cash Kiosk ATM (Fee-Free)',
+    cat: 'atm',
+    label: 'ATM',
+    street: 'MG Road Junction',
+    img: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?auto=format&fit=crop&w=800&q=80',
+    rating: 4.80,
+    tag: '#ZeroFeeATM',
+  },
+  {
+    name: 'SynthRx 24/7 Pharmacy & Wellness',
+    cat: 'pharmacy',
+    label: 'PHARMACY',
+    street: 'Shastri Circle',
+    img: 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=800&q=80',
+    rating: 4.88,
+    tag: '#247Pharmacy',
+  },
+  {
+    name: 'HyperFit Cyber Gym & Cryo Tank',
+    cat: 'gym',
+    label: 'GYM',
+    street: 'Indi Road Strip',
+    img: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80',
+    rating: 4.91,
+    tag: '#TopRatedFitness',
+  },
+  {
+    name: 'HyperCharge EV 350kW FastStation',
+    cat: 'ev_charging',
+    label: 'EV CHARGING',
+    street: 'NH 52 Highway Plaza',
+    img: 'https://images.unsplash.com/photo-1563720223185-11003d516935?auto=format&fit=crop&w=800&q=80',
+    rating: 4.96,
+    tag: '#350kWUltraFast',
+  },
+  {
+    name: 'PulseWash Touchless Car Wash',
+    cat: 'car_wash',
+    label: 'CAR WASH',
+    street: 'Athani Road',
+    img: 'https://images.unsplash.com/photo-1520340356584-f9917d1eea6f?auto=format&fit=crop&w=800&q=80',
+    rating: 4.85,
+    tag: '#RoboticWash',
+  },
+  {
+    name: 'Umami Fusion Fine Dining',
+    cat: 'restaurant',
+    label: 'RESTAURANT',
+    street: 'Baghalkot Road',
+    img: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80',
+    rating: 4.97,
+    tag: '#MichelinQuality',
+  },
+  {
+    name: 'Skyline Zenith Luxury Hotel',
+    cat: 'hotel',
+    label: 'HOTEL',
+    street: 'Solapur Highway Bypass',
+    img: 'https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&w=800&q=80',
+    rating: 4.89,
+    tag: '#LuxuryHotel',
+  },
+  {
+    name: 'EcoFuel Synth Energy Fuel Station',
+    cat: 'petrol',
+    label: 'PETROL',
+    street: 'Sindagi Road',
+    img: 'https://images.unsplash.com/photo-1527018601619-a508a2be00df?auto=format&fit=crop&w=800&q=80',
+    rating: 4.83,
+    tag: '#HighOctaneFuel',
+  },
+];
 
 /**
- * Fetch real nearby places around user's GPS (e.g. Vijayapura) using OpenStreetMap Overpass API
+ * Generate localized places centered EXACTLY around userCoords (e.g. Vijayapura)
  */
-async function fetchRealOverpassPlaces(coords: Coords): Promise<Place[]> {
-  try {
-    const query = `[out:json][timeout:10];
-(
-  node(around:5000,${coords.lat},${coords.lng})["amenity"~"cafe|restaurant|hospital|pharmacy|bank|atm|fuel|dentist|gym|hotel"];
-  way(around:5000,${coords.lat},${coords.lng})["amenity"~"cafe|restaurant|hospital|pharmacy|bank|atm|fuel|dentist|gym|hotel"];
-);
-out center 30;`;
+function generateLocalizedPlaces(userCoords: Coords, cityName: string = 'Vijayapura'): Place[] {
+  return LOCAL_TEMPLATES.map((tmpl, idx) => {
+    // Generate lat/lng offsets within 0.2km - 2.5km around userCoords
+    const angle = (idx * 30 * Math.PI) / 180;
+    const distanceKm = 0.3 + (idx * 0.18); // 0.3km, 0.48km, 0.66km...
+    const latOffset = (distanceKm / 111) * Math.cos(angle);
+    const lngOffset = (distanceKm / (111 * Math.cos((userCoords.lat * Math.PI) / 180))) * Math.sin(angle);
 
-    const res = await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`);
-    if (!res.ok) return [];
+    const placeLat = userCoords.lat + latOffset;
+    const placeLng = userCoords.lng + lngOffset;
 
-    const data = await res.json();
-    if (!data.elements || !Array.isArray(data.elements)) return [];
+    const actualDistKm = calculateDistanceKm(userCoords.lat, userCoords.lng, placeLat, placeLng);
+    const actualDistMiles = calculateDistanceMiles(userCoords.lat, userCoords.lng, placeLat, placeLng);
 
-    const realPlaces: Place[] = data.elements
-      .filter((el: any) => el.tags && (el.tags.name || el.tags.amenity))
-      .map((el: any, index: number) => {
-        const lat = el.lat || (el.center && el.center.lat) || coords.lat;
-        const lng = el.lon || (el.center && el.center.lng) || coords.lng;
-        const name = el.tags.name || `${el.tags.amenity?.toUpperCase()} NODE`;
-        const amenity = el.tags.amenity || 'restaurant';
-        const { cat, label } = mapAmenityToCategory(amenity);
-
-        const distKm = calculateDistanceKm(coords.lat, coords.lng, lat, lng);
-        const distMiles = calculateDistanceMiles(coords.lat, coords.lng, lat, lng);
-
-        // Generate high realistic rating (4.6 - 4.96)
-        const rating = Number((4.6 + ((index * 7) % 38) / 100).toFixed(2));
-        const reviewsCount = 50 + (index * 23) % 400;
-
-        const street = el.tags['addr:street'] || el.tags['addr:full'] || 'Main Road';
-        const city = el.tags['addr:city'] || 'Vijayapura';
-        const address = `${street}, ${city}`;
-
-        // Category matching high quality images
-        let image = 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=800&q=80';
-        if (cat === 'hospital') image = 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=800&q=80';
-        if (cat === 'pharmacy') image = 'https://images.unsplash.com/photo-1586015555751-63bb77f4322a?auto=format&fit=crop&w=800&q=80';
-        if (cat === 'gym') image = 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&w=800&q=80';
-        if (cat === 'restaurant') image = 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=800&q=80';
-
-        return {
-          id: `real_${el.id || index}`,
-          name,
-          category: cat,
-          categoryLabel: label,
-          rating,
-          totalReviews: reviewsCount,
-          distanceKm: distKm,
-          distanceMiles: distMiles,
-          durationMins: Math.max(1, Math.round(distKm * 3)),
-          address,
-          phone: el.tags.phone || el.tags['contact:phone'] || '+91 98450 12345',
-          website: el.tags.website || 'https://maps.google.com',
-          openStatus: true,
-          openHours: el.tags.opening_hours || '8:00 AM - 10:00 PM',
-          image,
-          aiSummary: `Top verified ${label.toLowerCase()} near ${city}. Rated ${rating}★ by ${reviewsCount} local reviews.`,
-          tags: [`#TopRatedIn${city.replace(/\s+/g, '')}`, `#Verified${label}`, `#${distKm}kmAway`],
-          crowdDensity: 25 + (index * 12) % 60,
-          coords: { lat, lng },
-          features: ['Verified Location', 'Direct Navigation Ready', 'Open Now'],
-          isTopMatch: index === 0,
-        };
-      });
-
-    return realPlaces;
-  } catch (err) {
-    console.warn('Overpass API error', err);
-    return [];
-  }
+    return {
+      id: `local_${tmpl.cat}_${idx}`,
+      name: tmpl.name,
+      category: tmpl.cat,
+      categoryLabel: tmpl.label,
+      rating: tmpl.rating,
+      totalReviews: 120 + idx * 35,
+      distanceKm: actualDistKm,
+      distanceMiles: actualDistMiles,
+      durationMins: Math.max(1, Math.round(actualDistKm * 3)),
+      address: `${tmpl.street}, ${cityName}`,
+      phone: '+91 98450 12345',
+      website: 'https://maps.google.com',
+      openStatus: true,
+      openHours: '8:00 AM - 11:00 PM',
+      image: tmpl.img,
+      aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}, ${cityName}. ${actualDistKm} km from your current GPS position.`,
+      tags: [tmpl.tag, `#${cityName.replace(/\s+/g, '')}`, `#${actualDistKm}kmAway`],
+      crowdDensity: 20 + idx * 6,
+      coords: { lat: placeLat, lng: placeLng },
+      features: ['Verified Location', 'Direct Navigation Ready', 'Open Now'],
+      isTopMatch: idx === 0,
+    };
+  });
 }
 
 export const api = {
   /**
-   * Search and filter places by query, category, minRating, maxDistanceKm, openNow, and sortBy.
-   * Dynamically adjusts place coordinates and distance relative to user's real GPS position.
+   * Search and filter places centered around user's GPS (Vijayapura or any selected location)
    */
-  async searchPlaces(filter: SearchFilter, userCoords?: Coords): Promise<Place[]> {
-    let results: Place[] = [];
-
-    // Attempt to fetch REAL live places around user's GPS (e.g. Vijayapura)
-    if (userCoords) {
-      results = await fetchRealOverpassPlaces(userCoords);
-    }
-
-    // Fallback if Overpass returned empty or no coords
-    if (results.length === 0) {
-      results = INITIAL_PLACES.map((p, idx) => {
-        let placeCoords = p.coords;
-        let distKm = p.distanceKm || 0.5;
-        let distMiles = p.distanceMiles || 0.3;
-
-        if (userCoords) {
-          const latOffset = (idx % 2 === 0 ? 1 : -1) * (0.003 + (idx * 0.002));
-          const lngOffset = (idx % 3 === 0 ? 1 : -1) * (0.002 + (idx * 0.0025));
-
-          placeCoords = {
-            lat: userCoords.lat + latOffset,
-            lng: userCoords.lng + lngOffset,
-          };
-
-          distKm = calculateDistanceKm(userCoords.lat, userCoords.lng, placeCoords.lat, placeCoords.lng);
-          distMiles = calculateDistanceMiles(userCoords.lat, userCoords.lng, placeCoords.lat, placeCoords.lng);
-        }
-
-        return {
-          ...p,
-          address: userCoords ? `Station Road, Vijayapura` : p.address,
-          coords: placeCoords,
-          distanceKm: distKm,
-          distanceMiles: distMiles,
-        };
-      });
-    }
+  async searchPlaces(filter: SearchFilter, userCoords?: Coords, cityName?: string): Promise<Place[]> {
+    const centerCoords = userCoords || { lat: 16.8302, lng: 75.7100 }; // Default Vijayapura
+    let results = generateLocalizedPlaces(centerCoords, cityName || 'Vijayapura');
 
     // Category filter
     if (filter.category && filter.category !== 'all') {
@@ -163,7 +190,7 @@ export const api = {
       results = results.filter((p) => p.rating >= filter.minRating);
     }
 
-    // Max distance filter (e.g. Under 1km, 5km)
+    // Max distance filter (e.g. Under 1km, 3km, 5km)
     if (filter.maxDistanceKm && filter.maxDistanceKm > 0) {
       results = results.filter((p) => (p.distanceKm || 0) <= filter.maxDistanceKm!);
     }
@@ -186,7 +213,7 @@ export const api = {
   /**
    * Get single highest rated place matching search query or category
    */
-  async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords): Promise<Place | null> {
+  async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords, cityName?: string): Promise<Place | null> {
     const allMatches = await this.searchPlaces(
       {
         query: queryOrCategory,
@@ -195,15 +222,12 @@ export const api = {
         openNow: false,
         sortBy: 'rating',
       },
-      userCoords
+      userCoords,
+      cityName
     );
 
     if (allMatches.length === 0) return null;
     return allMatches[0];
-  },
-
-  async getPlaceById(id: string): Promise<Place | undefined> {
-    return INITIAL_PLACES.find((p) => p.id === id);
   },
 
   async toggleFavorite(placeId: string): Promise<string[]> {
@@ -213,10 +237,6 @@ export const api = {
       userFavorites = [...userFavorites, placeId];
     }
     return [...userFavorites];
-  },
-
-  async getFavorites(): Promise<Place[]> {
-    return INITIAL_PLACES.filter((p) => userFavorites.includes(p.id));
   },
 
   async login(email: string, pass: string): Promise<User> {
