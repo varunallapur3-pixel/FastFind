@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: Build Frontend
+        env:
+          VITE_GOOGLE_MAPS_API_KEY: AIzaSyC6cPDG7aOVzx8QfuHBWfOAGPbEmpLUICI
         run: npm run build
 
       - name: Setup Pages
