@@ -84,18 +84,29 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  let originParam = 'My+Location';
+  // Always use origin=My+Location so Google Maps displays "Your location" without resolving to random POI names like "VEDIC MATHS & ABACUS"
+  const originParam = 'My+Location';
 
-  // Only pass userLat, userLng as origin if they are in reasonable proximity (< 100km) to destination.
-  // This prevents ISP IP-geolocation mismatches (e.g., ISP node in Bengaluru while viewing Vijayapura places).
-  if (userLat !== undefined && userLng !== undefined) {
-    const distKm = calculateDistanceKm(userLat, userLng, destLat, destLng);
-    if (distKm <= 100) {
-      originParam = `${userLat},${userLng}`;
-    }
+  // Clean place name & address from UI status strings
+  const cleanName = (destinationName || '')
+    .replace(/\(Your Exact GPS Location\)/gi, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/,?\s*Nearby/gi, '')
+    .trim();
+
+  const cleanAddress = (destinationAddress || '')
+    .replace(/Your Exact GPS Location/gi, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/,?\s*Nearby/gi, '')
+    .trim();
+
+  let targetQuery = cleanName;
+  if (cleanAddress && !cleanName.toLowerCase().includes(cleanAddress.toLowerCase())) {
+    targetQuery = `${cleanName}, ${cleanAddress}`;
   }
 
-  const destParam = `${destLat},${destLng}`;
+  // Format destination as place query so Google Maps displays the real target business name (e.g. Apex Dental Care Studio) instead of random coordinate POIs
+  const destParam = targetQuery ? encodeURIComponent(targetQuery) : `${destLat},${destLng}`;
 
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
 }
