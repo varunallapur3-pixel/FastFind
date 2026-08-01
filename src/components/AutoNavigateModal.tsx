@@ -88,7 +88,7 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
           <span className="w-1 h-1 rounded-full bg-[#849495]" />
           <div className="flex items-center gap-1 text-[#00dbe9]">
             <MapPin className="w-3.5 h-3.5" />
-            <span>{place.distanceMiles} miles</span>
+            <span>{place.distanceKm ?? place.distanceMiles} km</span>
           </div>
           <span className="w-1 h-1 rounded-full bg-[#849495]" />
           <div className="flex items-center gap-1 text-[#fface8]">

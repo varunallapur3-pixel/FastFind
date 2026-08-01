@@ -1,5 +1,8 @@
 import { Place, SearchFilter, User, Coords, CategoryId } from '../types';
 import { calculateDistanceKm, calculateDistanceMiles } from '../utils/geo';
+import { hasGoogleMapsApiKey, SEARCH_RADIUS_KM } from '../config/maps';
+import { searchGooglePlaces, getGoogleTopRatedPlace } from './googlePlaces';
+import { parseSearchTarget } from '../utils/searchTarget';
 
 let userFavorites: string[] = ['local_cafe_0', 'local_rest_1'];
 
@@ -537,9 +540,9 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'N
       : 'Nearby';
 
   return NEARBY_TEMPLATES.map((tmpl, idx) => {
-    // Generate tight offsets strictly between 0.15km and 3.8km around user's exact GPS location (all <= 4000 meters)
+    // Generate offsets between 0.15km and 2.9km around user's GPS (within 3km radius)
     const angle = (idx * 14 * Math.PI) / 180;
-    const distanceKm = 0.15 + (idx * 0.11); // 0.15km, 0.26km, 0.37km... All strictly <= 3.8km (within 4000m radius)
+    const distanceKm = 0.15 + (idx * 0.09); // 0.15km, 0.24km... all <= 2.9km
     const latOffset = (distanceKm / 111) * Math.cos(angle);
     const lngOffset = (distanceKm / (111 * Math.cos((userCoords.lat * Math.PI) / 180))) * Math.sin(angle);
 
@@ -566,30 +569,20 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'N
       openHours: tmpl.openHours,
       image: tmpl.img,
       aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}. Exactly ${actualDistKm} km from your current GPS position.`,
-      tags: ['#Within4km', `#${actualDistKm}kmAway`],
+      tags: [`#Within${SEARCH_RADIUS_KM}km`, `#${actualDistKm}kmAway`],
       crowdDensity: 15 + idx * 3,
       coords: { lat: placeLat, lng: placeLng },
-      features: ['Under 4km Radius', 'Verified Location', 'Open Now'],
-      isTopMatch: idx === 0,
+      features: [`Within ${SEARCH_RADIUS_KM}km`, 'Verified Location', 'Open Now'],
+      isTopMatch: false,
     };
   });
 }
 
-export const api = {
-  /**
-   * Search places centered strictly around user's live GPS position within 4km (4000 meters) radius
-   */
-  async searchPlaces(filter: SearchFilter, userCoords?: Coords, locationLabel?: string): Promise<Place[]> {
-    if (!userCoords) {
-      return [];
-    }
-
-    const cacheKey = `${filter.category}_${filter.query}_${filter.maxDistanceKm}_${filter.minRating}_${filter.openNow}_${filter.sortBy}_${userCoords.lat.toFixed(3)}_${userCoords.lng.toFixed(3)}`;
-    const cached = searchCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.data;
-    }
-
+function searchMockPlaces(
+  filter: SearchFilter,
+  userCoords: Coords,
+  locationLabel?: string
+): Place[] {
     let results = generatePlacesAroundUser(userCoords, locationLabel);
 
     // 1 & 2. Query / Keyword & Category Filter
@@ -613,8 +606,8 @@ export const api = {
       results = results.filter((p) => p.rating >= filter.minRating);
     }
 
-    // 4. Max Distance Radius Filter (STRICTLY <= 4.0 km / 4000 meters default)
-    const maxRadiusKm = filter.maxDistanceKm && filter.maxDistanceKm > 0 ? filter.maxDistanceKm : 4.0;
+    // 4. Max Distance Radius Filter (default 3 km)
+    const maxRadiusKm = filter.maxDistanceKm && filter.maxDistanceKm > 0 ? filter.maxDistanceKm : SEARCH_RADIUS_KM;
     results = results.filter((p) => {
       const dist = calculateDistanceKm(userCoords.lat, userCoords.lng, p.coords.lat, p.coords.lng);
       p.distanceKm = dist;
@@ -639,32 +632,78 @@ export const api = {
     // 7. Filter invalid ratings
     results = results.filter((p) => typeof p.rating === 'number' && p.rating >= 0 && p.rating <= 5.0);
 
-    // 8. Sorting Order: Highest Rating -> Most Reviews -> Shortest Distance
-    results.sort((a, b) => {
-      if (b.rating !== a.rating) {
-        return b.rating - a.rating; // Highest rating first
+    // 8. Sort by rating or distance
+    if (filter.sortBy === 'distance') {
+      results.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+    } else {
+      results.sort((a, b) => {
+        if (b.rating !== a.rating) return b.rating - a.rating;
+        if (b.totalReviews !== a.totalReviews) return b.totalReviews - a.totalReviews;
+        return (a.distanceKm || 0) - (b.distanceKm || 0);
+      });
+    }
+
+    if (results.length > 0) {
+      results[0] = { ...results[0], isTopMatch: true };
+    }
+
+    return results;
+}
+
+export const api = {
+  /**
+   * Search places within 3km of user's GPS. Uses Google Places API when configured.
+   */
+  async searchPlaces(filter: SearchFilter, userCoords?: Coords, locationLabel?: string): Promise<Place[]> {
+    if (!userCoords) {
+      return [];
+    }
+
+    const cacheKey = `${filter.category}_${filter.query}_${filter.maxDistanceKm}_${filter.minRating}_${filter.openNow}_${filter.sortBy}_${userCoords.lat.toFixed(3)}_${userCoords.lng.toFixed(3)}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      return cached.data;
+    }
+
+    let results: Place[];
+
+    if (hasGoogleMapsApiKey()) {
+      try {
+        results = await searchGooglePlaces(filter, userCoords);
+      } catch (err) {
+        console.warn('Google Places search failed, using mock data:', err);
+        results = searchMockPlaces(filter, userCoords, locationLabel);
       }
-      if (b.totalReviews !== a.totalReviews) {
-        return b.totalReviews - a.totalReviews; // Most reviews second
-      }
-      return (a.distanceKm || 0) - (b.distanceKm || 0); // Shortest distance third
-    });
+    } else {
+      results = searchMockPlaces(filter, userCoords, locationLabel);
+    }
 
     searchCache.set(cacheKey, { timestamp: Date.now(), data: results });
     return results;
   },
 
   /**
-   * Get top rated place strictly under 4.0km radius from user's live GPS
+   * Get the highest-rated place within 3km for a query or category.
    */
   async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords, locationLabel?: string): Promise<Place | null> {
     if (!userCoords) return null;
+
+    const { query, category } = parseSearchTarget(queryOrCategory);
+
+    if (hasGoogleMapsApiKey()) {
+      try {
+        return await getGoogleTopRatedPlace(queryOrCategory, userCoords);
+      } catch (err) {
+        console.warn('Google top-rated lookup failed, using mock data:', err);
+      }
+    }
+
     const allMatches = await this.searchPlaces(
       {
-        query: queryOrCategory,
-        category: 'all',
+        query,
+        category,
         minRating: 0,
-        maxDistanceKm: 4.0,
+        maxDistanceKm: SEARCH_RADIUS_KM,
         openNow: false,
         sortBy: 'rating',
       },
@@ -672,8 +711,7 @@ export const api = {
       locationLabel
     );
 
-    if (allMatches.length === 0) return null;
-    return allMatches[0];
+    return allMatches[0] ?? null;
   },
 
   async toggleFavorite(placeId: string): Promise<string[]> {

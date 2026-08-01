@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Place, CategoryId, User, ActiveView, SearchFilter, Coords } from './types';
 import { api } from './services/api';
 import { getUserLocation, getGoogleMapsDirUrl, CITY_COORDS } from './utils/geo';
+import { SEARCH_RADIUS_KM } from './config/maps';
 import { Navbar } from './components/Navbar';
 import { SearchHUD } from './components/SearchHUD';
 import { CategoryGrid } from './components/CategoryGrid';
@@ -35,12 +36,12 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State (Defaults to < 4 KM / 4000m Radius!)
+  // Search Filter State (defaults to 3 km radius)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
     minRating: 0,
-    maxDistanceKm: 4, // Default < 4 KM / 4000m radius
+    maxDistanceKm: SEARCH_RADIUS_KM,
     openNow: false,
     sortBy: 'rating',
   });
@@ -56,7 +57,7 @@ export function App() {
       setLocationLabel('Your Exact GPS Location');
       setGpsStatus('locked');
       setSelectedCity('gps');
-      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within 4km radius`);
+      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within ${SEARCH_RADIUS_KM}km radius`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err: any) {
       setGpsStatus('manual');
@@ -117,30 +118,35 @@ export function App() {
     });
   }, []);
 
-  // Handle Manual Search Submit (Click on SEARCH NEARBY button or Enter key)
-  const handleManualSearchSubmit = useCallback((query: string) => {
-    const activeQuery = query.trim();
-    setFilter((prev) => {
-      const nextCategory = activeQuery !== '' ? 'all' : prev.category;
-      return {
-        ...prev,
-        query: activeQuery,
-        category: nextCategory,
-      };
-    });
+  // Handle Manual Search Submit — find highest-rated place within 3km
+  const handleManualSearchSubmit = useCallback(
+    async (query: string) => {
+      const activeQuery = query.trim();
+      setFilter((prev) => {
+        const parsed = activeQuery ? { query: activeQuery, category: 'all' as const } : { query: '', category: prev.category };
+        return { ...prev, ...parsed };
+      });
 
-    setAlertNotification(`🔍 Searching 4km radius for "${activeQuery || 'All Places'}"...`);
-    setTimeout(() => setAlertNotification(null), 3000);
+      setAlertNotification(`🔍 Finding highest-rated "${activeQuery || 'nearby places'}" within ${SEARCH_RADIUS_KM}km...`);
+      setTimeout(() => setAlertNotification(null), 3000);
 
-    setTimeout(() => {
-      const section = document.getElementById('results-section');
-      if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords, locationLabel);
+      if (topPlace) {
+        setAutoNavPlace(topPlace);
       } else {
-        window.scrollTo({ top: 480, behavior: 'smooth' });
+        setAlertNotification(`No top-rated match found within ${SEARCH_RADIUS_KM}km radius.`);
+        setTimeout(() => setAlertNotification(null), 3000);
       }
-    }, 50);
-  }, []);
+
+      setTimeout(() => {
+        const section = document.getElementById('results-section');
+        if (section) {
+          section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 50);
+    },
+    [userCoords, locationLabel, filter.category]
+  );
 
   // Handle Category Select
   const handleSelectCategory = useCallback((cat: CategoryId) => {
@@ -159,7 +165,7 @@ export function App() {
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
-      setAlertNotification('No top match found within 2km radius.');
+      setAlertNotification(`No top-rated match found within ${SEARCH_RADIUS_KM}km radius.`);
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
@@ -216,7 +222,7 @@ export function App() {
         }}
         onGoHome={() => {
           setActiveView('home');
-          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: 2, openNow: false, sortBy: 'rating' });
+          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: SEARCH_RADIUS_KM, openNow: false, sortBy: 'rating' });
         }}
         onOpenFavorites={() => setActiveView('favorites')}
         favoritesCount={favorites.length}
@@ -288,7 +294,7 @@ export function App() {
             {/* Quick Mode Pill */}
             <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-[#1c1b1b] border border-[#a9f900]/30 font-mono text-xs text-[#a9f900] shrink-0">
               <Shield className="w-4 h-4 text-[#a9f900]" />
-              <span>RADIUS: &lt; 4KM (4000M) PROXIMITY</span>
+              <span>RADIUS: &lt; {SEARCH_RADIUS_KM}KM PROXIMITY</span>
             </div>
           </div>
 
@@ -321,28 +327,28 @@ export function App() {
             {/* Distance Radius Filter Buttons */}
             <div className="flex rounded-lg bg-[#1c1b1b] p-1 border border-white/10">
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 2 }))}
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 1 }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 2 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                  filter.maxDistanceKm === 1 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
                 }`}
               >
-                &lt; 2 KM
+                &lt; 1 KM
               </button>
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 4 }))}
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: SEARCH_RADIUS_KM }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 4 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                  filter.maxDistanceKm === SEARCH_RADIUS_KM ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
                 }`}
               >
-                &lt; 4 KM (4000M)
+                &lt; {SEARCH_RADIUS_KM} KM
               </button>
               <button
-                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 10 }))}
+                onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 5 }))}
                 className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                  filter.maxDistanceKm === 10 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
+                  filter.maxDistanceKm === 5 ? 'bg-[#a9f900] text-[#223600]' : 'text-[#849495] hover:text-white'
                 }`}
               >
-                &lt; 10 KM
+                &lt; 5 KM
               </button>
               <button
                 onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 0 }))}
@@ -375,6 +381,19 @@ export function App() {
             </div>
           </div>
         </section>
+
+        {/* Interactive Map with Google Directions route */}
+        {places.length > 0 && (
+          <section className="mb-8">
+            <InteractiveMap
+              places={places}
+              selectedPlace={selectedPlace || places[0]}
+              onSelectPlace={setSelectedPlace}
+              onStartNavigation={setActiveNavPlace}
+              userCoords={userCoords}
+            />
+          </section>
+        )}
 
         {/* RESULTS GRID / FAVORITES VIEW */}
         <section id="results-section" className="mb-12">

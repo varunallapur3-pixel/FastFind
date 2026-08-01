@@ -47,6 +47,7 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
 export const CategoryGrid: React.FC<CategoryGridProps> = ({
   selectedCategory,
   onSelectCategory,
+  onAutoNavigateCategory,
 }) => {
   return (
     <section className="mb-10">
@@ -91,10 +92,19 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
                   <IconComponent className="w-5 h-5" />
                 </div>
 
-                <div className="flex items-center text-[10px] font-mono text-[#a9f900] bg-[#a9f900]/10 px-1.5 py-0.5 rounded border border-[#a9f900]/30 opacity-80 group-hover:opacity-100">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectCategory(cat.id);
+                    onAutoNavigateCategory(cat.id);
+                  }}
+                  className="flex items-center text-[10px] font-mono text-[#a9f900] bg-[#a9f900]/10 px-1.5 py-0.5 rounded border border-[#a9f900]/30 opacity-80 hover:opacity-100 hover:bg-[#a9f900]/20 transition-all cursor-pointer"
+                  title={`Find top-rated ${cat.label} within 3km`}
+                >
                   <Star className="w-2.5 h-2.5 fill-current mr-0.5" />
                   <span>TOP</span>
-                </div>
+                </button>
               </div>
 
               {/* Bottom Label */}
