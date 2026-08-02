@@ -17,7 +17,7 @@ import {
 
 interface PlaceDetailModalProps {
   place: Place;
-  userCoords?: Coords;
+  userCoords?: Coords | null;
   isFavorite: boolean;
   onClose: () => void;
   onToggleFavorite: (id: string) => void;

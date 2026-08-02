@@ -1,18 +1,6 @@
 import { GPSLocationDetails } from '../types';
 
 /**
- * Known Indian city coordinates lookup for instant location switching
- */
-export const CITY_COORDS: Record<string, { lat: number; lng: number; name: string }> = {
-  vijayapura: { lat: 16.8302, lng: 75.7100, name: 'Vijayapura, Karnataka' },
-  bengaluru: { lat: 12.9716, lng: 77.5946, name: 'Bengaluru, Karnataka' },
-  hyderabad: { lat: 17.3850, lng: 78.4867, name: 'Hyderabad, Telangana' },
-  mumbai: { lat: 19.0760, lng: 72.8777, name: 'Mumbai, Maharashtra' },
-  delhi: { lat: 28.6139, lng: 77.2090, name: 'New Delhi, Delhi' },
-  pune: { lat: 18.5204, lng: 73.8567, name: 'Pune, Maharashtra' },
-};
-
-/**
  * Calculate distance between two lat/lng coordinates in kilometers (Haversine formula)
  */
 export function calculateDistanceKm(
@@ -71,61 +59,14 @@ export async function getCityFromCoords(lat: number, lng: number): Promise<strin
 }
 
 /**
- * Fallback to IP-based location detection if browser GPS fails or is denied
- */
-export async function getLocationByIP(): Promise<GPSLocationDetails> {
-  try {
-    const res = await fetch('https://ipapi.co/json/');
-    if (res.ok) {
-      const data = await res.json();
-      if (data.latitude && data.longitude) {
-        const cityParts = [data.city, data.region].filter(Boolean);
-        return {
-          lat: data.latitude,
-          lng: data.longitude,
-          cityName: cityParts.join(', ') || data.country_name || 'Detected IP Location',
-          source: 'ip',
-        };
-      }
-    }
-  } catch (e) {
-    // Secondary IP location API fallback
-    try {
-      const res2 = await fetch('https://freeipapi.com/api/json');
-      if (res2.ok) {
-        const data2 = await res2.json();
-        if (data2.latitude && data2.longitude) {
-          const cityParts = [data2.cityName, data2.regionName].filter(Boolean);
-          return {
-            lat: data2.latitude,
-            lng: data2.longitude,
-            cityName: cityParts.join(', ') || data2.countryName || 'Detected IP Location',
-            source: 'ip',
-          };
-        }
-      }
-    } catch (e2) {
-      console.warn('IP location fetch failed', e2);
-    }
-  }
-
-  // Absolute last resort fallback (Vijayapura)
-  return {
-    lat: 16.8302,
-    lng: 75.7100,
-    cityName: 'Vijayapura, Karnataka',
-    source: 'ip',
-  };
-}
-
-/**
  * Get user's exact live location directly via browser Geolocation API.
- * Triggers the browser/Google native location permission popup prompt ("Allow / Block").
+ * Uses { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } per strict requirements.
+ * Rejects immediately if permission is denied or unavailable — no silent fallback.
  */
 export async function getUserLocation(): Promise<GPSLocationDetails> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by your browser'));
+      reject(new Error('Geolocation is not supported by your browser.'));
       return;
     }
 
@@ -133,7 +74,7 @@ export async function getUserLocation(): Promise<GPSLocationDetails> {
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        let cityName = 'Your Live GPS Location';
+        let cityName = 'Live GPS Location';
         try {
           const fetchedCity = await getCityFromCoords(lat, lng);
           if (fetchedCity && fetchedCity !== 'Your Location') {
@@ -152,12 +93,12 @@ export async function getUserLocation(): Promise<GPSLocationDetails> {
         });
       },
       (error) => {
-        console.warn('Browser GPS location error:', error.message);
+        console.warn('Geolocation permission error or unavailable:', error.message);
         reject(error);
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 10000,
         maximumAge: 0,
       }
     );

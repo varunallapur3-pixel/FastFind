@@ -8,14 +8,14 @@ interface InteractiveMapProps {
   places: Place[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place) => void;
-  userCoords?: { lat: number; lng: number };
+  userCoords?: { lat: number; lng: number } | null;
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   places,
   selectedPlace,
   onSelectPlace,
-  userCoords = { lat: 16.8302, lng: 75.7100 },
+  userCoords,
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
@@ -25,7 +25,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   // Initialize Map & recenter when GPS changes
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !userCoords) return;
 
     if (!leafletMap.current) {
       const map = L.map(mapRef.current, {
@@ -47,13 +47,13 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     } else {
       leafletMap.current.panTo([userCoords.lat, userCoords.lng]);
     }
-  }, [userCoords.lat, userCoords.lng]);
+  }, [userCoords?.lat, userCoords?.lng]);
 
   // Update markers
   useEffect(() => {
     const map = leafletMap.current;
     const group = markersGroup.current;
-    if (!map || !group) return;
+    if (!map || !group || !userCoords) return;
 
     group.clearLayers();
 
@@ -113,8 +113,8 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                 place.address,
                 place.coords.lat,
                 place.coords.lng,
-                userCoords.lat,
-                userCoords.lng
+                userCoords?.lat,
+                userCoords?.lng
               );
               window.open(url, '_blank');
             };
@@ -124,12 +124,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       marker.addTo(group);
     });
-  }, [places, selectedPlace, userCoords.lat, userCoords.lng, onSelectPlace]);
+  }, [places, selectedPlace, userCoords?.lat, userCoords?.lng, onSelectPlace]);
 
   // Draw Google Directions route for selected place
   useEffect(() => {
     const map = leafletMap.current;
-    if (!map || !selectedPlace) return;
+    if (!map || !selectedPlace || !userCoords) return;
 
     if (polylineLayer.current) {
       map.removeLayer(polylineLayer.current);
@@ -139,7 +139,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     let cancelled = false;
 
     getDirections(userCoords, selectedPlace.coords).then((route) => {
-      if (cancelled || !leafletMap.current) return;
+      if (cancelled || !leafletMap.current || !userCoords) return;
 
       const latlngs: L.LatLngExpression[] = route?.path?.length
         ? route.path.map((p) => [p.lat, p.lng] as L.LatLngExpression)

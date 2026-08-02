@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Place, CategoryId, User, ActiveView, SearchFilter, Coords } from './types';
 import { api } from './services/api';
-import { getUserLocation, getGoogleMapsDirUrl, CITY_COORDS } from './utils/geo';
+import { getUserLocation, getGoogleMapsDirUrl } from './utils/geo';
 import { SEARCH_RADIUS_KM } from './config/maps';
 import { Navbar } from './components/Navbar';
 import { SearchHUD } from './components/SearchHUD';
@@ -18,10 +18,10 @@ export function App() {
   const [user, setUser] = useState<User | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
 
-  // User Live Hardware GPS Coords (Default: Vijayapura)
-  const [userCoords, setUserCoords] = useState<Coords>({ lat: 16.8302, lng: 75.7100 });
-  const [locationLabel, setLocationLabel] = useState<string>('Vijayapura');
-  const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'manual'>('requesting');
+  // User Live Hardware GPS Coords (Strict Real Geolocation Only)
+  const [userCoords, setUserCoords] = useState<Coords | null>(null);
+  const [locationLabel, setLocationLabel] = useState<string>('Detecting Live GPS...');
+  const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'denied'>('requesting');
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
@@ -44,23 +44,23 @@ export function App() {
     sortBy: 'rating',
   });
 
-  const [selectedCity, setSelectedCity] = useState<string>('gps');
-
-  // Request user location via browser native GPS prompt popup
+  // Request user location via browser native GPS prompt
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
     try {
       const details = await getUserLocation();
       setUserCoords({ lat: details.lat, lng: details.lng });
-      const city = details.cityName || 'Your Location';
+      const city = details.cityName || 'Live GPS Location';
       setLocationLabel(city);
       setGpsStatus('locked');
-      setSelectedCity('gps');
       setAlertNotification(`📍 GPS Locked: ${city} (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)})`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err: any) {
-      setGpsStatus('manual');
-      setAlertNotification('⚠️ Browser location permission required. Please click "Allow" when prompted or select your city.');
+      setGpsStatus('denied');
+      setUserCoords(null);
+      setLocationLabel('Location Permission Denied');
+      setPlaces([]);
+      setAlertNotification('⚠️ Real GPS Location Required. Please allow location access in your browser to find places within 4km.');
     }
   }, []);
 
@@ -68,40 +68,29 @@ export function App() {
     requestGPSLocation();
   }, [requestGPSLocation]);
 
-  // Handle Manual City Select
-  const handleCitySelect = (cityKey: string) => {
-    if (cityKey === 'gps') {
-      requestGPSLocation();
+  // Fetch places centered on userCoords using live Google Places API
+  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords | null) => {
+    if (!coords) {
+      setPlaces([]);
       return;
     }
-    const city = CITY_COORDS[cityKey];
-    if (city) {
-      setUserCoords({ lat: city.lat, lng: city.lng });
-      setLocationLabel(city.name);
-      setGpsStatus('manual');
-      setSelectedCity(cityKey);
-      setAlertNotification(`Location manually set to ${city.name}`);
-      setTimeout(() => setAlertNotification(null), 3000);
-    }
-  };
-
-  // Fetch places centered on userCoords
-  const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords, label: string) => {
+    setLoading(true);
     try {
-      const results = await api.searchPlaces(currentFilter, coords, label);
+      const results = await api.searchPlaces(currentFilter, coords);
       setPlaces(results);
     } catch (err) {
-      console.error('Search places error', err);
+      console.error('Search places error:', err);
+      setPlaces([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (hasStarted) {
-      fetchPlaces(filter, userCoords, locationLabel);
+    if (hasStarted && userCoords) {
+      fetchPlaces(filter, userCoords);
     }
-  }, [filter, userCoords, locationLabel, fetchPlaces, hasStarted]);
+  }, [filter, userCoords, fetchPlaces, hasStarted]);
 
   // Handle Search Input Change
   const handleSearch = useCallback((query: string) => {
@@ -116,7 +105,7 @@ export function App() {
     });
   }, []);
 
-  // Handle Manual Search Submit — find highest-rated place within 3km
+  // Handle Manual Search Submit — find highest-rated place within 4km
   const handleManualSearchSubmit = useCallback(
     async (query: string) => {
       const activeQuery = query.trim();
@@ -125,10 +114,16 @@ export function App() {
         return { ...prev, ...parsed };
       });
 
+      if (!userCoords) {
+        setAlertNotification('⚠️ Real GPS Location Required. Please allow location access.');
+        setTimeout(() => setAlertNotification(null), 3000);
+        return;
+      }
+
       setAlertNotification(`🔍 Finding highest-rated "${activeQuery || 'nearby places'}" within ${SEARCH_RADIUS_KM}km...`);
       setTimeout(() => setAlertNotification(null), 3000);
 
-      const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords, locationLabel);
+      const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords);
       if (topPlace) {
         setAutoNavPlace(topPlace);
       } else {
@@ -143,7 +138,7 @@ export function App() {
         }
       }, 50);
     },
-    [userCoords, locationLabel, filter.category]
+    [userCoords, filter.category]
   );
 
   // Handle Category Select
@@ -159,7 +154,12 @@ export function App() {
   }, []);
 
   const handleAutoNavigateTopRated = async (searchTermOrCat: string) => {
-    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, locationLabel);
+    if (!userCoords) {
+      setAlertNotification('⚠️ Real GPS Location Required. Please allow location access.');
+      setTimeout(() => setAlertNotification(null), 3000);
+      return;
+    }
+    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords);
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
@@ -175,8 +175,8 @@ export function App() {
       place.address,
       place.coords.lat,
       place.coords.lng,
-      userCoords.lat,
-      userCoords.lng
+      userCoords?.lat,
+      userCoords?.lng
     );
     window.open(mapsUrl, '_blank');
   };
@@ -240,40 +240,23 @@ export function App() {
           </div>
         )}
 
-        {/* GPS LIVE LOCATION & CITY SELECTOR HUD BAR */}
+        {/* REAL GPS LIVE LOCATION HUD BAR */}
         <section className="mb-6 p-3.5 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2">
-            <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-[#00dbe9]'}`} />
-            <span className="text-[#849495] uppercase">CURRENT LOCATION:</span>
+            <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-red-400'}`} />
+            <span className="text-[#849495] uppercase">REAL GPS LOCATION:</span>
             <span className="text-[#00dbe9] font-bold">
-              {locationLabel} ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})
+              {userCoords ? `${locationLabel} (${userCoords.lat.toFixed(4)}, ${userCoords.lng.toFixed(4)})` : 'Permission Needed'}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Quick City Switcher Dropdown */}
-            <select
-              onChange={(e) => handleCitySelect(e.target.value)}
-              className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer font-bold"
-              value={selectedCity}
-            >
-              <option value="gps">📍 Auto Location ({locationLabel})</option>
-              <option value="vijayapura">Vijayapura</option>
-              <option value="bengaluru">Bengaluru</option>
-              <option value="hyderabad">Hyderabad</option>
-              <option value="mumbai">Mumbai</option>
-              <option value="delhi">New Delhi</option>
-              <option value="pune">Pune</option>
-            </select>
-
-            <button
-              onClick={requestGPSLocation}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#a9f900]/10 text-[#a9f900] border border-[#a9f900]/30 hover:bg-[#a9f900] hover:text-[#223600] transition-all cursor-pointer font-bold"
-            >
-              <Locate className="w-3.5 h-3.5" />
-              <span>DETECT MY LOCATION</span>
-            </button>
-          </div>
+          <button
+            onClick={requestGPSLocation}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#a9f900]/10 text-[#a9f900] border border-[#a9f900]/30 hover:bg-[#a9f900] hover:text-[#223600] transition-all cursor-pointer font-bold"
+          >
+            <Locate className="w-3.5 h-3.5" />
+            <span>RE-SYNC REAL GPS</span>
+          </button>
         </section>
 
         {/* HERO HEADER & PERSISTENT SEARCH HUD */}

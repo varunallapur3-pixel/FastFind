@@ -5,7 +5,7 @@ import { Navigation, Star, MapPin, Clock, X, Zap, ExternalLink, ShieldCheck } fr
 
 interface AutoNavigateModalProps {
   place: Place;
-  userCoords?: Coords;
+  userCoords?: Coords | null;
   onClose: () => void;
   onViewDetails: (place: Place) => void;
 }

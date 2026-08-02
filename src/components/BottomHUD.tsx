@@ -6,7 +6,7 @@ interface BottomHUDProps {
   activeView: ActiveView;
   onChangeView: (view: ActiveView) => void;
   favoritesCount: number;
-  userCoords?: Coords;
+  userCoords?: Coords | null;
   locationLabel?: string;
 }
 
