@@ -231,19 +231,37 @@ export async function searchGooglePlaces(
   }
 
   let places = rawResults
-    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 0.5, category !== 'all' ? category : 'all'))
+    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 1.0, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null);
 
-  // If 0 places found within strict radius (e.g. rural area or ISP location), try 12km wider radius
-  if (places.length === 0 && maxRadiusKm <= 5) {
+  // Fallback 1: If 0 places found within strict radius, try 10km radius
+  if (places.length === 0) {
     try {
+      const fallbackQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'top rated places');
       const widerResults = await runTextSearch(service, {
-        query: query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'top rated places'),
+        query: fallbackQuery,
         location,
-        radius: 12000,
+        radius: 10000,
       });
       places = widerResults
-        .map((r) => googleResultToPlace(r, userCoords, 15, category !== 'all' ? category : 'all'))
+        .map((r) => googleResultToPlace(r, userCoords, 25, category !== 'all' ? category : 'all'))
+        .filter((p): p is Place => p !== null);
+    } catch {
+      // ignore
+    }
+  }
+
+  // Fallback 2: If still 0 places (e.g. unpopulated ISP coordinate), query Google Places textSearch globally for category/query
+  if (places.length === 0) {
+    try {
+      const searchQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'popular places');
+      const globalResults = await runTextSearch(service, {
+        query: `${searchQuery} in Karnataka India`,
+        location,
+        radius: 50000,
+      });
+      places = globalResults
+        .map((r) => googleResultToPlace(r, userCoords, 100, category !== 'all' ? category : 'all'))
         .filter((p): p is Place => p !== null);
     } catch {
       // ignore
