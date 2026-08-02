@@ -530,8 +530,17 @@ const NEARBY_TEMPLATES: {
   },
 ];
 
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
 /**
- * Dynamically generate nearby businesses pinned strictly around user's live GPS coordinates (within 0.1km - 3.8km radius)
+ * Dynamically generate nearby businesses pinned strictly around user's live GPS coordinates (within 0.3km - 3.8km radius)
  */
 function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'Nearby'): Place[] {
   const cityLabel =
@@ -542,9 +551,11 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'N
       : 'Your City';
 
   return NEARBY_TEMPLATES.map((tmpl, idx) => {
-    // Generate offsets between 0.15km and 3.9km around user's GPS (within 4km / 4000m radius)
-    const angle = (idx * 14 * Math.PI) / 180;
-    const distanceKm = 0.15 + (idx * 0.12); // 0.15km, 0.27km... all <= 3.9km
+    // Generate natural, realistic scattered coordinates across all directions (0 to 360 degrees)
+    const seed = hashString(tmpl.name + tmpl.cat + idx);
+    const angle = ((seed % 360) * Math.PI) / 180;
+    const distanceKm = 0.3 + ((seed % 35) / 10); // 0.3km to 3.8km
+    
     const latOffset = (distanceKm / 111) * Math.cos(angle);
     const lngOffset = (distanceKm / (111 * Math.cos((userCoords.lat * Math.PI) / 180))) * Math.sin(angle);
 
@@ -570,9 +581,9 @@ function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'N
       openStatus: tmpl.openStatus,
       openHours: tmpl.openHours,
       image: tmpl.img,
-      aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}. Exactly ${actualDistKm} km from your current GPS position.`,
+      aiSummary: `#1 rated ${tmpl.label.toLowerCase()} near ${tmpl.street}. Exactly ${actualDistKm} km from your current position.`,
       tags: [`#Within${SEARCH_RADIUS_KM}km`, `#${actualDistKm}kmAway`],
-      crowdDensity: 15 + idx * 3,
+      crowdDensity: 15 + (seed % 65),
       coords: { lat: placeLat, lng: placeLng },
       features: [`Within ${SEARCH_RADIUS_KM}km`, 'Verified Location', 'Open Now'],
       isTopMatch: false,

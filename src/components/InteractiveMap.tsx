@@ -71,7 +71,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       .bindPopup('<strong style="color: #00dbe9;">YOUR LOCATION</strong>')
       .addTo(group);
 
-    places.forEach((place) => {
+    places.slice(0, 15).forEach((place) => {
       const isSelected = selectedPlace?.id === place.id;
       const isTop = place.isTopMatch || place.rating >= 4.5;
       const markerColor = isSelected ? '#a9f900' : isTop ? '#00dbe9' : '#b9cacb';
