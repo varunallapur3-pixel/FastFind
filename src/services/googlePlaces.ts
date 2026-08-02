@@ -11,36 +11,7 @@ import { calculateDistanceKm, calculateDistanceMiles } from '../utils/geo';
 import { parseSearchTarget } from '../utils/searchTarget';
 import { loadGoogleMaps } from './googleMapsLoader';
 
-/**
- * Request user's live position directly from Google's Official Geolocation API endpoint.
- * Google itself processes and determines the location.
- */
-export async function getGoogleLocation(): Promise<Coords> {
-  const apiKey = GOOGLE_MAPS_API_KEY;
-  if (!apiKey || apiKey === 'your_google_maps_api_key_here') {
-    throw new Error('Google Maps API key not configured.');
-  }
 
-  const response = await fetch(`https://www.googleapis.com/geolocation/v1/geolocate?key=${apiKey}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ considerIp: true }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Google Geolocation API failed with status ${response.status}`);
-  }
-
-  const data = await response.json();
-  if (data.location && typeof data.location.lat === 'number' && typeof data.location.lng === 'number') {
-    return {
-      lat: data.location.lat,
-      lng: data.location.lng,
-    };
-  }
-
-  throw new Error('Google Geolocation API returned invalid location coordinates.');
-}
 
 const DEFAULT_IMAGE =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80';
