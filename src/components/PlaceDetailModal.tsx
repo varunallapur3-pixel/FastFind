@@ -21,7 +21,6 @@ interface PlaceDetailModalProps {
   isFavorite: boolean;
   onClose: () => void;
   onToggleFavorite: (id: string) => void;
-  onStartNavigation: (place: Place) => void;
 }
 
 export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
@@ -30,7 +29,6 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
   isFavorite,
   onClose,
   onToggleFavorite,
-  onStartNavigation,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn overflow-y-auto">
@@ -178,7 +176,7 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
           </div>
 
           {/* Action Triggers */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+          <div className="mt-2">
             <button
               onClick={() => {
                 const mapsUrl = getGoogleMapsDirUrl(
@@ -191,17 +189,10 @@ export const PlaceDetailModal: React.FC<PlaceDetailModalProps> = ({
                 );
                 window.open(mapsUrl, '_blank');
               }}
-              className="flex items-center justify-center gap-2 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-sm py-4 rounded-xl shadow-[0_0_20px_rgba(169,249,0,0.4)] active:scale-95 transition-all cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 bg-[#a9f900] hover:bg-white text-[#223600] font-headline font-bold text-sm py-4 rounded-xl shadow-[0_0_20px_rgba(169,249,0,0.4)] active:scale-95 transition-all cursor-pointer"
             >
               <Navigation className="w-4 h-4 fill-current" />
-              <span>GOOGLE MAPS NAV</span>
-            </button>
-
-            <button
-              onClick={() => onStartNavigation(place)}
-              className="flex items-center justify-center gap-2 bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-sm py-4 rounded-xl shadow-[0_0_20px_rgba(0,219,233,0.4)] active:scale-95 transition-all cursor-pointer"
-            >
-              <span>IN-APP MAP HUD</span>
+              <span>NAVIGATE IN GOOGLE MAPS</span>
             </button>
           </div>
         </div>

@@ -8,7 +8,6 @@ import { SearchHUD } from './components/SearchHUD';
 import { CategoryGrid } from './components/CategoryGrid';
 import { AutoNavigateModal } from './components/AutoNavigateModal';
 import { InteractiveMap } from './components/InteractiveMap';
-import { LiveNavigationOverlay } from './components/LiveNavigationOverlay';
 import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
@@ -31,7 +30,6 @@ export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [autoNavPlace, setAutoNavPlace] = useState<Place | null>(null);
-  const [activeNavPlace, setActiveNavPlace] = useState<Place | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
@@ -390,7 +388,6 @@ export function App() {
               places={places}
               selectedPlace={selectedPlace || places[0]}
               onSelectPlace={setSelectedPlace}
-              onStartNavigation={setActiveNavPlace}
               userCoords={userCoords}
             />
           </section>
@@ -536,10 +533,6 @@ export function App() {
           place={autoNavPlace}
           userCoords={userCoords}
           onClose={() => setAutoNavPlace(null)}
-          onStartInAppNavigation={(p) => {
-            setAutoNavPlace(null);
-            setActiveNavPlace(p);
-          }}
           onViewDetails={(p) => {
             setAutoNavPlace(null);
             setSelectedPlace(p);
@@ -555,23 +548,6 @@ export function App() {
           isFavorite={favorites.includes(selectedPlace.id)}
           onClose={() => setSelectedPlace(null)}
           onToggleFavorite={handleToggleFavorite}
-          onStartNavigation={(p) => {
-            setSelectedPlace(null);
-            setActiveNavPlace(p);
-          }}
-        />
-      )}
-
-      {/* 3. Live Navigation Turn-by-Turn Overlay */}
-      {activeNavPlace && (
-        <LiveNavigationOverlay
-          place={activeNavPlace}
-          userCoords={userCoords}
-          onEndNavigation={() => setActiveNavPlace(null)}
-          onArrived={() => {
-            setAlertNotification(`You have arrived at ${activeNavPlace.name}!`);
-            setActiveNavPlace(null);
-          }}
         />
       )}
 

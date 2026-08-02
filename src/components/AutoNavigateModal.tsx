@@ -7,7 +7,6 @@ interface AutoNavigateModalProps {
   place: Place;
   userCoords?: Coords;
   onClose: () => void;
-  onStartInAppNavigation: (place: Place) => void;
   onViewDetails: (place: Place) => void;
 }
 
@@ -15,7 +14,6 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
   place,
   userCoords,
   onClose,
-  onStartInAppNavigation,
   onViewDetails,
 }) => {
   const [countdown, setCountdown] = useState(5);
@@ -38,7 +36,7 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
 
     if (countdown === 0) {
       openGoogleMapsNav();
-      onStartInAppNavigation(place);
+      onClose();
       return;
     }
 
@@ -47,7 +45,7 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
     }, 1000);
 
     return () => clearTimeout(timer);
-  }, [countdown, autoNavActive, onStartInAppNavigation, place]);
+  }, [countdown, autoNavActive, onClose, place]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fadeIn">
@@ -155,17 +153,17 @@ export const AutoNavigateModal: React.FC<AutoNavigateModalProps> = ({
 
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => onStartInAppNavigation(place)}
-              className="flex items-center justify-center gap-1.5 bg-[#00dbe9]/20 hover:bg-[#00dbe9]/30 text-[#00dbe9] border border-[#00dbe9]/40 font-mono text-xs py-3 rounded-xl active:scale-95 transition-all cursor-pointer"
-            >
-              <span>IN-APP MAP HUD</span>
-            </button>
-
-            <button
               onClick={() => onViewDetails(place)}
               className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-[#e5e2e1] border border-white/15 font-mono text-xs py-3 rounded-xl active:scale-95 transition-all cursor-pointer"
             >
               <span>DETAILS</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center gap-1.5 bg-white/5 hover:bg-white/10 text-[#849495] border border-white/15 font-mono text-xs py-3 rounded-xl active:scale-95 transition-all cursor-pointer"
+            >
+              <span>DISMISS</span>
             </button>
           </div>
         </div>

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Place } from '../types';
 import { getDirections } from '../services/googleDirections';
+import { getGoogleMapsDirUrl } from '../utils/geo';
 import L from 'leaflet';
 
 interface InteractiveMapProps {
   places: Place[];
   selectedPlace: Place | null;
   onSelectPlace: (place: Place) => void;
-  onStartNavigation: (place: Place) => void;
   userCoords?: { lat: number; lng: number };
 }
 
@@ -15,7 +15,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   places,
   selectedPlace,
   onSelectPlace,
-  onStartNavigation,
   userCoords = { lat: 16.8302, lng: 75.7100 },
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -107,13 +106,25 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         onSelectPlace(place);
         setTimeout(() => {
           const btn = document.getElementById(`nav-btn-${place.id}`);
-          if (btn) btn.onclick = () => onStartNavigation(place);
+          if (btn) {
+            btn.onclick = () => {
+              const url = getGoogleMapsDirUrl(
+                place.name,
+                place.address,
+                place.coords.lat,
+                place.coords.lng,
+                userCoords.lat,
+                userCoords.lng
+              );
+              window.open(url, '_blank');
+            };
+          }
         }, 100);
       });
 
       marker.addTo(group);
     });
-  }, [places, selectedPlace, userCoords.lat, userCoords.lng, onSelectPlace, onStartNavigation]);
+  }, [places, selectedPlace, userCoords.lat, userCoords.lng, onSelectPlace]);
 
   // Draw Google Directions route for selected place
   useEffect(() => {
