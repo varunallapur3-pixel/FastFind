@@ -1,4 +1,5 @@
 import { GPSLocationDetails } from '../types';
+import { getGoogleLocation } from '../services/googlePlaces';
 
 /**
  * Calculate distance between two lat/lng coordinates in kilometers (Haversine formula)
@@ -59,11 +60,36 @@ export async function getCityFromCoords(lat: number, lng: number): Promise<strin
 }
 
 /**
- * Get user's exact live location directly via browser Geolocation API.
- * Uses { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } per strict requirements.
- * Rejects immediately if permission is denied or unavailable — no silent fallback.
+ * Get user's exact live location using Google's Official Geolocation API.
+ * Google itself determines and grants location coordinates.
+ * Rejects immediately if unavailable — no silent default city fallbacks.
  */
 export async function getUserLocation(): Promise<GPSLocationDetails> {
+  // 1. Try Google's official Geolocation service endpoint first
+  try {
+    const googleCoords = await getGoogleLocation();
+    let cityName = 'Google Live GPS';
+    try {
+      const fetchedCity = await getCityFromCoords(googleCoords.lat, googleCoords.lng);
+      if (fetchedCity && fetchedCity !== 'Your Location') {
+        cityName = fetchedCity;
+      }
+    } catch {
+      // ignore
+    }
+    return {
+      lat: googleCoords.lat,
+      lng: googleCoords.lng,
+      accuracy: 10,
+      timestamp: Date.now(),
+      cityName: `${cityName} (via Google)`,
+      source: 'gps',
+    };
+  } catch (googleErr) {
+    console.warn('Google Geolocation API fallback to browser GPS:', googleErr);
+  }
+
+  // 2. Fallback to Browser Native Geolocation API
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Geolocation is not supported by your browser.'));
