@@ -57,15 +57,16 @@ function inferCategory(types: string[] = []): CategoryId {
 function googleResultToPlace(
   result: google.maps.places.PlaceResult,
   userCoords: Coords,
+  maxRadiusKm: number = SEARCH_RADIUS_KM,
   fallbackCategory: CategoryId = 'all'
 ): Place | null {
   if (!result.geometry?.location || !result.place_id) return null;
 
-  const lat = result.geometry.location.lat();
-  const lng = result.geometry.location.lng();
+  const lat = typeof result.geometry.location.lat === 'function' ? result.geometry.location.lat() : (result.geometry.location as any).lat;
+  const lng = typeof result.geometry.location.lng === 'function' ? result.geometry.location.lng() : (result.geometry.location as any).lng;
   const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
 
-  if (distanceKm > SEARCH_RADIUS_KM) return null;
+  if (distanceKm > maxRadiusKm) return null;
 
   const category =
     fallbackCategory !== 'all' ? fallbackCategory : inferCategory(result.types);
@@ -100,10 +101,10 @@ function googleResultToPlace(
     openHours: openStatus ? 'Open Now' : 'Closed',
     image,
     aiSummary: `Top-rated ${CATEGORY_LABELS[category].toLowerCase()} — ${rating}★ with ${totalReviews} reviews, ${distanceKm} km from you.`,
-    tags: [`#Within${SEARCH_RADIUS_KM}km`, `#${distanceKm}kmAway`],
+    tags: [`#Within${maxRadiusKm}km`, `#${distanceKm}kmAway`],
     crowdDensity: Math.min(90, 20 + totalReviews / 10),
     coords: { lat, lng },
-    features: [`Within ${SEARCH_RADIUS_KM}km`, 'Google Places'],
+    features: [`Within ${maxRadiusKm}km`, 'Google Places'],
   };
 }
 
@@ -161,11 +162,14 @@ export async function searchGooglePlaces(
 ): Promise<Place[]> {
   await loadGoogleMaps();
 
+  const location = new google.maps.LatLng(userCoords.lat, userCoords.lng);
   const mapDiv = document.createElement('div');
-  const map = new google.maps.Map(mapDiv);
+  const map = new google.maps.Map(mapDiv, {
+    center: location,
+    zoom: 14,
+  });
   const service = new google.maps.places.PlacesService(map);
 
-  const location = new google.maps.LatLng(userCoords.lat, userCoords.lng);
   const { query, category } = filter.query
     ? parseSearchTarget(filter.query)
     : { query: '', category: filter.category };
@@ -243,7 +247,7 @@ export async function searchGooglePlaces(
     filter.maxDistanceKm && filter.maxDistanceKm > 0 ? filter.maxDistanceKm : SEARCH_RADIUS_KM;
 
   let places = rawResults
-    .map((r) => googleResultToPlace(r, userCoords, category !== 'all' ? category : 'all'))
+    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null)
     .filter((p) => (p.distanceKm || 0) <= maxRadiusKm);
 
