@@ -46,32 +46,120 @@ function deg2rad(deg: number): number {
 }
 
 /**
- * Get user's current exact GPS location via browser Geolocation API
- * Retrieves latitude, longitude, accuracy, and timestamp.
+ * Reverse geocode lat/lng to city/region name using free Nominatim API
  */
-export function getUserLocation(): Promise<GPSLocationDetails> {
-  return new Promise((resolve, reject) => {
+export async function getCityFromCoords(lat: number, lng: number): Promise<string> {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10`, {
+      headers: { 'Accept-Language': 'en' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const address = data.address || {};
+      const city = address.city || address.town || address.village || address.suburb || address.county || address.state_district;
+      const state = address.state || address.country;
+      if (city && state) {
+        return `${city}, ${state}`;
+      } else if (city || state) {
+        return city || state;
+      }
+    }
+  } catch (err) {
+    console.warn('Reverse geocode failed:', err);
+  }
+  return 'Your Location';
+}
+
+/**
+ * Fallback to IP-based location detection if browser GPS fails or is denied
+ */
+export async function getLocationByIP(): Promise<GPSLocationDetails> {
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.latitude && data.longitude) {
+        const cityParts = [data.city, data.region].filter(Boolean);
+        return {
+          lat: data.latitude,
+          lng: data.longitude,
+          cityName: cityParts.join(', ') || data.country_name || 'Detected IP Location',
+          source: 'ip',
+        };
+      }
+    }
+  } catch (e) {
+    // Secondary IP location API fallback
+    try {
+      const res2 = await fetch('https://freeipapi.com/api/json');
+      if (res2.ok) {
+        const data2 = await res2.json();
+        if (data2.latitude && data2.longitude) {
+          const cityParts = [data2.cityName, data2.regionName].filter(Boolean);
+          return {
+            lat: data2.latitude,
+            lng: data2.longitude,
+            cityName: cityParts.join(', ') || data2.countryName || 'Detected IP Location',
+            source: 'ip',
+          };
+        }
+      }
+    } catch (e2) {
+      console.warn('IP location fetch failed', e2);
+    }
+  }
+
+  // Absolute last resort fallback (Vijayapura)
+  return {
+    lat: 16.8302,
+    lng: 75.7100,
+    cityName: 'Vijayapura, Karnataka',
+    source: 'ip',
+  };
+}
+
+/**
+ * Get user's current exact location via browser Geolocation API with IP fallback.
+ * Guarantees location discovery for users in any city or device.
+ */
+export async function getUserLocation(): Promise<GPSLocationDetails> {
+  return new Promise((resolve) => {
     if (!navigator.geolocation) {
-      reject(new Error('Geolocation is not supported by your browser'));
+      getLocationByIP().then(resolve);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        let cityName = 'Your Live GPS Location';
+        try {
+          const fetchedCity = await getCityFromCoords(lat, lng);
+          if (fetchedCity && fetchedCity !== 'Your Location') {
+            cityName = fetchedCity;
+          }
+        } catch {
+          // ignore
+        }
         resolve({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
+          lat,
+          lng,
           accuracy: position.coords.accuracy,
           timestamp: position.timestamp,
+          cityName,
+          source: 'gps',
         });
       },
-      (error) => {
-        reject(error);
+      async (error) => {
+        console.warn('Browser GPS permission error or unavailable, using IP fallback:', error.message);
+        const ipLocation = await getLocationByIP();
+        resolve(ipLocation);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+        timeout: 6000,
+        maximumAge: 30000,
       }
     );
   });

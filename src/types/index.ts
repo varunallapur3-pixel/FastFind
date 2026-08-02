@@ -33,6 +33,8 @@ export interface Coords {
 export interface GPSLocationDetails extends Coords {
   accuracy?: number;
   timestamp?: number;
+  cityName?: string;
+  source?: 'gps' | 'ip';
 }
 
 export interface Review {

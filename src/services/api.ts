@@ -535,14 +535,16 @@ const NEARBY_TEMPLATES: {
  */
 function generatePlacesAroundUser(userCoords: Coords, locationLabel: string = 'Nearby'): Place[] {
   const cityLabel =
-    locationLabel && !locationLabel.toLowerCase().includes('gps location')
+    locationLabel &&
+    !locationLabel.toLowerCase().includes('gps location') &&
+    !locationLabel.toLowerCase().includes('exact gps')
       ? locationLabel
-      : 'Nearby';
+      : 'Your City';
 
   return NEARBY_TEMPLATES.map((tmpl, idx) => {
-    // Generate offsets between 0.15km and 2.9km around user's GPS (within 3km radius)
+    // Generate offsets between 0.15km and 3.9km around user's GPS (within 4km / 4000m radius)
     const angle = (idx * 14 * Math.PI) / 180;
-    const distanceKm = 0.15 + (idx * 0.09); // 0.15km, 0.24km... all <= 2.9km
+    const distanceKm = 0.15 + (idx * 0.12); // 0.15km, 0.27km... all <= 3.9km
     const latOffset = (distanceKm / 111) * Math.cos(angle);
     const lngOffset = (distanceKm / (111 * Math.cos((userCoords.lat * Math.PI) / 180))) * Math.sin(angle);
 

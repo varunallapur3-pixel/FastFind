@@ -69,7 +69,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     });
 
     L.marker([userCoords.lat, userCoords.lng], { icon: userIcon })
-      .bindPopup('<strong style="color: #00dbe9;">YOUR GPS LOCATION</strong>')
+      .bindPopup('<strong style="color: #00dbe9;">YOUR LOCATION</strong>')
       .addTo(group);
 
     places.forEach((place) => {
@@ -161,7 +161,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     <div className="relative w-full h-80 md:h-96 rounded-2xl overflow-hidden glass-card border border-white/10 shadow-2xl">
       <div className="absolute top-4 left-4 z-[400] flex items-center gap-2 bg-[#050505]/80 backdrop-blur-md px-3 py-1.5 rounded-lg border border-white/10 font-mono text-xs text-[#00dbe9]">
         <span className="w-2 h-2 rounded-full bg-[#a9f900] animate-pulse" />
-        <span>LIVE MAP • {places.length} PLACES WITHIN 3KM</span>
+        <span>LIVE MAP • {places.length} PLACES WITHIN 4KM (4000M)</span>
       </div>
 
       {routeEta && selectedPlace && (

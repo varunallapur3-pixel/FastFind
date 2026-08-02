@@ -22,8 +22,6 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
   const leafletMap = useRef<L.Map | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
 
-  const [progressPercent, setProgressPercent] = useState(5);
-  const [speedKmh, setSpeedKmh] = useState(32);
   const [steps, setSteps] = useState<NavigationStep[]>([]);
   const [etaMins, setEtaMins] = useState(place.durationMins || 1);
   const [distanceText, setDistanceText] = useState(`${place.distanceKm || 0} km`);
@@ -126,23 +124,6 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
     });
   }, [userCoords, place]);
 
-  // Simulate navigation progress
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProgressPercent((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          onArrived();
-          return 100;
-        }
-        return prev + 8;
-      });
-      setSpeedKmh(28 + Math.floor(Math.random() * 8));
-    }, 2500);
-
-    return () => clearInterval(interval);
-  }, [onArrived]);
-
   const currentStep = steps[0] || {
     id: 1,
     instruction: `Navigate to ${place.name}`,
@@ -160,7 +141,7 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
           </div>
           <div>
             <span className="text-[10px] font-mono text-[#a9f900] uppercase tracking-widest block font-bold">
-              GOOGLE MAPS DIRECTIONS • {currentStep.distance}
+              ROUTE OVERVIEW • {currentStep.distance} ({etaMins} MINS)
             </span>
             <h3 className="font-headline font-bold text-base md:text-lg text-[#e5e2e1] line-clamp-1">
               {currentStep.instruction}
@@ -176,14 +157,14 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#a9f900] text-[#223600] font-headline font-bold text-xs hover:bg-white shadow-[0_0_15px_rgba(169,249,0,0.5)] transition-all cursor-pointer"
           >
             <Navigation className="w-4 h-4 fill-current" />
-            <span className="hidden sm:inline">OPEN IN GOOGLE MAPS</span>
+            <span className="hidden sm:inline">START TURN-BY-TURN IN GOOGLE MAPS</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
 
           <button
             onClick={onEndNavigation}
             className="p-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 cursor-pointer"
-            title="Exit Route"
+            title="Close Route"
           >
             <X className="w-5 h-5" />
           </button>
@@ -191,15 +172,14 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
       </div>
 
       <div className="relative flex-1 my-4 rounded-2xl overflow-hidden glass-card border border-[#00dbe9]/30 bg-[#0d1117]">
-        <div className="scanline" />
         <div ref={mapRef} className="w-full h-full bg-[#0d1117]" />
 
         <div className="absolute top-4 left-4 z-[400] flex items-center gap-3 bg-black/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
-          <Gauge className="w-5 h-5 text-[#a9f900]" />
+          <Navigation className="w-5 h-5 text-[#a9f900]" />
           <div className="flex flex-col">
-            <span className="text-[10px] font-mono text-[#849495]">ETA</span>
+            <span className="text-[10px] font-mono text-[#849495]">TOTAL ETA</span>
             <span className="font-headline font-bold text-lg text-[#a9f900]">
-              {etaMins} <span className="text-xs font-mono text-[#849495]">MIN</span>
+              {etaMins} <span className="text-xs font-mono text-[#849495]">MIN ({distanceText})</span>
             </span>
           </div>
         </div>
@@ -207,23 +187,22 @@ export const LiveNavigationOverlay: React.FC<LiveNavigationOverlayProps> = ({
         <div className="absolute bottom-4 left-4 right-4 md:left-auto md:w-96 z-[400] p-4 rounded-2xl bg-[#0e0e0e]/95 border border-[#00dbe9]/50 shadow-[0_0_30px_rgba(0,219,233,0.4)] backdrop-blur-xl">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-mono text-[#a9f900] uppercase font-bold tracking-wider">
-              LIVE ROUTE • {distanceText}
+              DESTINATION • {distanceText}
             </span>
           </div>
           <h2 className="font-headline font-bold text-xl text-[#e5e2e1]">{place.name}</h2>
           <p className="text-xs font-mono text-[#b9cacb] mb-3">{place.address}</p>
 
-          <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden p-0.5 border border-white/10 mb-2">
-            <div
-              className="bg-gradient-to-r from-[#00dbe9] to-[#a9f900] h-full rounded-full transition-all duration-700 shadow-[0_0_15px_#a9f900]"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] font-mono text-[#849495]">
-            <span>START</span>
-            <span className="text-[#a9f900] font-bold">{progressPercent}% COMPLETED</span>
-            <span>{etaMins} MINS</span>
-          </div>
+          <a
+            href={googleMapsUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-[#a9f900] text-[#223600] font-headline font-bold text-xs hover:bg-white shadow-[0_0_15px_rgba(169,249,0,0.4)] transition-all cursor-pointer"
+          >
+            <Navigation className="w-4 h-4 fill-current" />
+            <span>LAUNCH GOOGLE MAPS NAVIGATION</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </div>
 

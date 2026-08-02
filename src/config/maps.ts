@@ -2,9 +2,9 @@ import { CategoryId } from '../types';
 
 export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-/** Strict search radius: 3 km (3000 meters) */
-export const SEARCH_RADIUS_KM = 3;
-export const SEARCH_RADIUS_METERS = SEARCH_RADIUS_KM * 1000;
+/** Strict search radius: 4 km (4000 meters) */
+export const SEARCH_RADIUS_KM = 4;
+export const SEARCH_RADIUS_METERS = 4000;
 
 export function hasGoogleMapsApiKey(): boolean {
   return Boolean(GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'your_google_maps_api_key_here');

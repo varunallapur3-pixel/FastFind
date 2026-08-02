@@ -48,21 +48,22 @@ export function App() {
 
   const [selectedCity, setSelectedCity] = useState<string>('gps');
 
-  // Request browser Hardware GPS location
+  // Request user location (Browser GPS with IP location fallback)
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
     try {
       const details = await getUserLocation();
       setUserCoords({ lat: details.lat, lng: details.lng });
-      setLocationLabel('Your Exact GPS Location');
+      const city = details.cityName || 'Your Location';
+      setLocationLabel(city);
       setGpsStatus('locked');
       setSelectedCity('gps');
-      setAlertNotification(`📍 Live GPS Locked (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)}) - Searching within ${SEARCH_RADIUS_KM}km radius`);
+      const srcText = details.source === 'gps' ? 'Live Device GPS' : 'IP Geolocation';
+      setAlertNotification(`📍 Location set to ${city} via ${srcText} (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)})`);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err: any) {
       setGpsStatus('manual');
-      setSelectedCity('vijayapura');
-      setAlertNotification('⚠️ Browser location permission required. Click "GRANT / RE-SYNC GPS" to enable live nearby search.');
+      setAlertNotification('⚠️ Unable to detect location automatically. Please select your city.');
     }
   }, []);
 
@@ -246,7 +247,7 @@ export function App() {
         <section className="mb-6 p-3.5 rounded-xl bg-[#131313] border border-white/10 flex flex-wrap items-center justify-between gap-3 font-mono text-xs">
           <div className="flex items-center gap-2">
             <Locate className={`w-4 h-4 ${gpsStatus === 'locked' ? 'text-[#a9f900] animate-pulse' : 'text-[#00dbe9]'}`} />
-            <span className="text-[#849495] uppercase">CURRENT HARDWARE GPS:</span>
+            <span className="text-[#849495] uppercase">CURRENT LOCATION:</span>
             <span className="text-[#00dbe9] font-bold">
               {locationLabel} ({userCoords.lat.toFixed(4)}, {userCoords.lng.toFixed(4)})
             </span>
@@ -259,7 +260,7 @@ export function App() {
               className="bg-[#1c1b1b] border border-white/15 text-[#a9f900] rounded-lg px-2.5 py-1 text-xs outline-none cursor-pointer font-bold"
               value={selectedCity}
             >
-              <option value="gps">📍 GPS Location (Active)</option>
+              <option value="gps">📍 Auto Location ({locationLabel})</option>
               <option value="vijayapura">Vijayapura</option>
               <option value="bengaluru">Bengaluru</option>
               <option value="hyderabad">Hyderabad</option>
@@ -273,7 +274,7 @@ export function App() {
               className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#a9f900]/10 text-[#a9f900] border border-[#a9f900]/30 hover:bg-[#a9f900] hover:text-[#223600] transition-all cursor-pointer font-bold"
             >
               <Locate className="w-3.5 h-3.5" />
-              <span>GRANT / RE-SYNC GPS</span>
+              <span>DETECT MY LOCATION</span>
             </button>
           </div>
         </section>
