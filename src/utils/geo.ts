@@ -119,13 +119,13 @@ export async function getLocationByIP(): Promise<GPSLocationDetails> {
 }
 
 /**
- * Get user's current exact location via browser Geolocation API with IP fallback.
- * Guarantees location discovery for users in any city or device.
+ * Get user's exact live location directly via browser Geolocation API.
+ * Triggers the browser/Google native location permission popup prompt ("Allow / Block").
  */
 export async function getUserLocation(): Promise<GPSLocationDetails> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      getLocationByIP().then(resolve);
+      reject(new Error('Geolocation is not supported by your browser'));
       return;
     }
 
@@ -151,15 +151,14 @@ export async function getUserLocation(): Promise<GPSLocationDetails> {
           source: 'gps',
         });
       },
-      async (error) => {
-        console.warn('Browser GPS permission error or unavailable, using IP fallback:', error.message);
-        const ipLocation = await getLocationByIP();
-        resolve(ipLocation);
+      (error) => {
+        console.warn('Browser GPS location error:', error.message);
+        reject(error);
       },
       {
         enableHighAccuracy: true,
-        timeout: 6000,
-        maximumAge: 30000,
+        timeout: 15000,
+        maximumAge: 0,
       }
     );
   });
