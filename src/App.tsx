@@ -12,6 +12,7 @@ import { PlaceDetailModal } from './components/PlaceDetailModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BottomHUD } from './components/BottomHUD';
+import { LocationPermissionModal } from './components/LocationPermissionModal';
 import { Star, MapPin, Navigation, Heart, Filter, Zap, Shield, Sparkles, ExternalLink, Locate, Compass } from 'lucide-react';
 
 export function App() {
@@ -22,6 +23,9 @@ export function App() {
   const [userCoords, setUserCoords] = useState<Coords>({ lat: 16.8302, lng: 75.7100 });
   const [locationLabel, setLocationLabel] = useState<string>('Vijayapura');
   const [gpsStatus, setGpsStatus] = useState<'requesting' | 'locked' | 'manual'>('requesting');
+  const [showLocationModal, setShowLocationModal] = useState<boolean>(false);
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,7 +38,7 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>([]);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State (defaults to 3 km radius)
+  // Search Filter State (defaults to 4 km radius)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
@@ -49,6 +53,8 @@ export function App() {
   // Request user location (Browser GPS with IP location fallback)
   const requestGPSLocation = useCallback(async () => {
     setGpsStatus('requesting');
+    setIsLocating(true);
+    setLocationError(null);
     try {
       const details = await getUserLocation();
       setUserCoords({ lat: details.lat, lng: details.lng });
@@ -58,10 +64,13 @@ export function App() {
       setSelectedCity('gps');
       const srcText = details.source === 'gps' ? 'Live Device GPS' : 'IP Geolocation';
       setAlertNotification(`📍 Location set to ${city} via ${srcText} (${details.lat.toFixed(4)}, ${details.lng.toFixed(4)})`);
+      setShowLocationModal(false);
       setTimeout(() => setAlertNotification(null), 4000);
     } catch (err: any) {
       setGpsStatus('manual');
-      setAlertNotification('⚠️ Unable to detect location automatically. Please select your city.');
+      setLocationError('Unable to access device location automatically. Please select a city.');
+    } finally {
+      setIsLocating(false);
     }
   }, []);
 
@@ -195,11 +204,13 @@ export function App() {
         onAuthSuccess={(authenticatedUser) => {
           setUser(authenticatedUser);
           setHasStarted(true);
+          setShowLocationModal(true);
           setAlertNotification(`Welcome back, ${authenticatedUser.name}!`);
           requestGPSLocation();
         }}
         onContinueAsGuest={() => {
           setHasStarted(true);
+          setShowLocationModal(true);
           requestGPSLocation();
         }}
       />
@@ -268,7 +279,10 @@ export function App() {
             </select>
 
             <button
-              onClick={requestGPSLocation}
+              onClick={() => {
+                setShowLocationModal(true);
+                requestGPSLocation();
+              }}
               className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#a9f900]/10 text-[#a9f900] border border-[#a9f900]/30 hover:bg-[#a9f900] hover:text-[#223600] transition-all cursor-pointer font-bold"
             >
               <Locate className="w-3.5 h-3.5" />
@@ -558,10 +572,25 @@ export function App() {
           onLoginSuccess={(u) => {
             setUser(u);
             setShowAuthModal(false);
+            setShowLocationModal(true);
             setAlertNotification(`Welcome back, ${u.name}! Signed in successfully.`);
+            requestGPSLocation();
           }}
         />
       )}
+
+      {/* 5. Location Permission & Confirmation Modal */}
+      <LocationPermissionModal
+        isOpen={showLocationModal}
+        onGrantGPS={requestGPSLocation}
+        onSelectCity={(cityKey) => {
+          handleCitySelect(cityKey);
+          setShowLocationModal(false);
+        }}
+        currentLocationLabel={locationLabel}
+        isLocating={isLocating}
+        errorMsg={locationError}
+      />
 
       {/* Bottom Floating Navigation HUD */}
       <BottomHUD
