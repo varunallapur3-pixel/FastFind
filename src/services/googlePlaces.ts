@@ -152,7 +152,7 @@ export async function searchGooglePlaces(
   if (query) {
     try {
       rawResults = await runTextSearch(service, {
-        query: `${query} near me`,
+        query,
         location,
         radius: SEARCH_RADIUS_METERS,
       });
@@ -161,10 +161,10 @@ export async function searchGooglePlaces(
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runTextSearch(service, {
-          query,
+        rawResults = await runNearbySearch(service, {
           location,
           radius: SEARCH_RADIUS_METERS,
+          keyword: query,
         });
       } catch {
         rawResults = [];
@@ -183,7 +183,7 @@ export async function searchGooglePlaces(
     if (rawResults.length === 0) {
       try {
         rawResults = await runTextSearch(service, {
-          query: `${category} near me`,
+          query: CATEGORY_LABELS[category] || category,
           location,
           radius: SEARCH_RADIUS_METERS,
         });
@@ -193,18 +193,17 @@ export async function searchGooglePlaces(
     }
   } else {
     try {
-      rawResults = await runNearbySearch(service, {
+      rawResults = await runTextSearch(service, {
+        query: 'hospital OR dentist OR cafe OR restaurant OR store OR pharmacy',
         location,
         radius: SEARCH_RADIUS_METERS,
-        keyword: 'point_of_interest',
       });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runTextSearch(service, {
-          query: 'popular places near me',
+        rawResults = await runNearbySearch(service, {
           location,
           radius: SEARCH_RADIUS_METERS,
         });
@@ -253,7 +252,7 @@ export async function getGoogleTopRatedPlace(
 ): Promise<Place | null> {
   const { query, category } = parseSearchTarget(queryOrCategory);
 
-  const results = await searchGooglePlaces(
+  let results = await searchGooglePlaces(
     {
       query,
       category,
@@ -264,6 +263,20 @@ export async function getGoogleTopRatedPlace(
     },
     userCoords
   );
+
+  if (results.length === 0) {
+    results = await searchGooglePlaces(
+      {
+        query,
+        category,
+        minRating: 0,
+        maxDistanceKm: 6,
+        openNow: false,
+        sortBy: 'rating',
+      },
+      userCoords
+    );
+  }
 
   return results[0] ?? null;
 }
