@@ -31,7 +31,7 @@ export function App() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [autoNavPlace, setAutoNavPlace] = useState<Place | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [favorites, setFavorites] = useState<string[]>(['nearby_cafe_0']);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
   // Search Filter State (defaults to 3 km radius)

@@ -4,7 +4,7 @@ import { hasGoogleMapsApiKey, SEARCH_RADIUS_KM } from '../config/maps';
 import { searchGooglePlaces, getGoogleTopRatedPlace } from './googlePlaces';
 import { parseSearchTarget } from '../utils/searchTarget';
 
-let userFavorites: string[] = ['local_cafe_0', 'local_rest_1'];
+let userFavorites: string[] = [];
 
 // Simple cache for search queries
 const searchCache = new Map<string, { timestamp: number; data: Place[] }>();
@@ -727,23 +727,23 @@ export const api = {
 
   async login(email: string, pass: string): Promise<User> {
     return {
-      id: 'usr_cyber_99',
-      name: email.split('@')[0].toUpperCase() || 'CYBER OPERATOR',
+      id: 'usr_' + Date.now(),
+      name: email.split('@')[0].toUpperCase() || 'USER',
       email,
-      token: 'jwt_mock_token_super_secret_cyber_99',
+      token: 'jwt_token_' + Date.now(),
       favorites: [...userFavorites],
-      recentSearches: ['Cafe', 'Dentist', 'Hospital'],
+      recentSearches: [],
     };
   },
 
   async signup(name: string, email: string, pass: string): Promise<User> {
     return {
-      id: 'usr_cyber_' + Math.floor(Math.random() * 1000),
+      id: 'usr_' + Date.now(),
       name: name.toUpperCase(),
       email,
-      token: 'jwt_mock_token_new_user',
+      token: 'jwt_token_new_user',
       favorites: [],
-      recentSearches: ['Top Rated Nearby'],
+      recentSearches: [],
     };
   },
 };
