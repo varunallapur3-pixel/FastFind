@@ -217,13 +217,23 @@ export async function searchGooglePlaces(
     }
   } else {
     try {
-      rawResults = await runNearbySearch(service, { location, bounds, radius: searchRadiusMeters });
+      rawResults = await runNearbySearch(service, {
+        location,
+        bounds,
+        radius: searchRadiusMeters,
+        keyword: 'establishment',
+      });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runTextSearch(service, { query: 'hospital dentist cafe restaurant store pharmacy', location, bounds, radius: searchRadiusMeters });
+        rawResults = await runNearbySearch(service, {
+          location,
+          bounds,
+          radius: searchRadiusMeters,
+          keyword: 'point_of_interest',
+        });
       } catch {
         rawResults = [];
       }
@@ -231,37 +241,36 @@ export async function searchGooglePlaces(
   }
 
   let places = rawResults
-    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 1.0, category !== 'all' ? category : 'all'))
+    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 2.0, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null);
 
-  // Fallback 1: If 0 places found within strict radius, try 10km radius
+  // Fallback 1: If 0 places found within strict radius, query 10km radius with keyword establishment
   if (places.length === 0) {
     try {
-      const fallbackQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'top rated places');
-      const widerResults = await runTextSearch(service, {
-        query: fallbackQuery,
+      const widerResults = await runNearbySearch(service, {
         location,
         radius: 10000,
+        keyword: query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'establishment'),
       });
       places = widerResults
-        .map((r) => googleResultToPlace(r, userCoords, 25, category !== 'all' ? category : 'all'))
+        .map((r) => googleResultToPlace(r, userCoords, 999, category !== 'all' ? category : 'all'))
         .filter((p): p is Place => p !== null);
     } catch {
       // ignore
     }
   }
 
-  // Fallback 2: If still 0 places (e.g. unpopulated ISP coordinate), query Google Places textSearch globally for category/query
+  // Fallback 2: If still 0 places (e.g. unpopulated desktop ISP coordinate), textSearch for category/query in region
   if (places.length === 0) {
     try {
       const searchQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'popular places');
       const globalResults = await runTextSearch(service, {
-        query: `${searchQuery} in Karnataka India`,
+        query: `${searchQuery} near Karnataka India`,
         location,
         radius: 50000,
       });
       places = globalResults
-        .map((r) => googleResultToPlace(r, userCoords, 100, category !== 'all' ? category : 'all'))
+        .map((r) => googleResultToPlace(r, userCoords, 999, category !== 'all' ? category : 'all'))
         .filter((p): p is Place => p !== null);
     } catch {
       // ignore
