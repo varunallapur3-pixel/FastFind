@@ -167,7 +167,9 @@ export async function getUserLocation(): Promise<GPSLocationDetails> {
 
 /**
  * Generate Google Maps direction URL forcing origin to "My Location" (Hardware GPS)
- * This guarantees Google Maps routes directly from where the user is physically standing!
+/**
+ * Generate Google Maps direction URL forcing origin to user location and destination to exact latitude & longitude.
+ * This guarantees Google Maps routes directly to the location within 4km without fuzzy text matching distant POIs.
  */
 export function getGoogleMapsDirUrl(
   destinationName: string,
@@ -177,29 +179,8 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  // Always use origin=My+Location so Google Maps displays "Your location" without resolving to random POI names like "VEDIC MATHS & ABACUS"
-  const originParam = 'My+Location';
-
-  // Clean place name & address from UI status strings
-  const cleanName = (destinationName || '')
-    .replace(/\(Your Exact GPS Location\)/gi, '')
-    .replace(/\([^)]*\)/g, '')
-    .replace(/,?\s*Nearby/gi, '')
-    .trim();
-
-  const cleanAddress = (destinationAddress || '')
-    .replace(/Your Exact GPS Location/gi, '')
-    .replace(/\([^)]*\)/g, '')
-    .replace(/,?\s*Nearby/gi, '')
-    .trim();
-
-  let targetQuery = cleanName;
-  if (cleanAddress && !cleanName.toLowerCase().includes(cleanAddress.toLowerCase())) {
-    targetQuery = `${cleanName}, ${cleanAddress}`;
-  }
-
-  // Format destination as place query so Google Maps displays the real target business name (e.g. Apex Dental Care Studio) instead of random coordinate POIs
-  const destParam = targetQuery ? encodeURIComponent(targetQuery) : `${destLat},${destLng}`;
+  const originParam = userLat && userLng ? `${userLat},${userLng}` : 'My+Location';
+  const destParam = `${destLat},${destLng}`;
 
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
 }
