@@ -175,22 +175,68 @@ export async function searchGooglePlaces(
   const googleType = category !== 'all' ? CATEGORY_TO_GOOGLE_TYPE[category] : undefined;
 
   if (query) {
-    rawResults = await runTextSearch(service, {
-      query,
-      location,
-      radius: SEARCH_RADIUS_METERS,
-    });
+    try {
+      rawResults = await runTextSearch(service, {
+        query: `${query} near me`,
+        location,
+        radius: SEARCH_RADIUS_METERS,
+      });
+    } catch {
+      rawResults = [];
+    }
+    if (rawResults.length === 0) {
+      try {
+        rawResults = await runTextSearch(service, {
+          query,
+          location,
+          radius: SEARCH_RADIUS_METERS,
+        });
+      } catch {
+        rawResults = [];
+      }
+    }
   } else if (googleType) {
-    rawResults = await runNearbySearch(service, {
-      location,
-      radius: SEARCH_RADIUS_METERS,
-      type: googleType,
-    });
+    try {
+      rawResults = await runNearbySearch(service, {
+        location,
+        radius: SEARCH_RADIUS_METERS,
+        type: googleType,
+      });
+    } catch {
+      rawResults = [];
+    }
+    if (rawResults.length === 0) {
+      try {
+        rawResults = await runTextSearch(service, {
+          query: `${category} near me`,
+          location,
+          radius: SEARCH_RADIUS_METERS,
+        });
+      } catch {
+        rawResults = [];
+      }
+    }
   } else {
-    rawResults = await runNearbySearch(service, {
-      location,
-      radius: SEARCH_RADIUS_METERS,
-    });
+    try {
+      rawResults = await runNearbySearch(service, {
+        location,
+        radius: SEARCH_RADIUS_METERS,
+        keyword: 'point_of_interest',
+      });
+    } catch {
+      rawResults = [];
+    }
+    if (rawResults.length === 0) {
+      try {
+        rawResults = await runTextSearch(service, {
+          query: 'popular places near me',
+          location,
+          radius: SEARCH_RADIUS_METERS,
+        });
+      } catch {
+        rawResults = [];
+      }
+    }
   }
 
   const maxRadiusKm =
@@ -198,7 +244,7 @@ export async function searchGooglePlaces(
 
   let places = rawResults
     .map((r) => googleResultToPlace(r, userCoords, category !== 'all' ? category : 'all'))
-    .filter((p): p is Place => p !== null && p.rating > 0)
+    .filter((p): p is Place => p !== null)
     .filter((p) => (p.distanceKm || 0) <= maxRadiusKm);
 
   if (filter.minRating > 0) {
