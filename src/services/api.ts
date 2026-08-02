@@ -5,29 +5,18 @@ import { parseSearchTarget } from '../utils/searchTarget';
 
 let userFavorites: string[] = [];
 
-// Simple cache for search queries
-const searchCache = new Map<string, { timestamp: number; data: Place[] }>();
-const CACHE_TTL_MS = 60000; // 1 minute cache
-
 export const api = {
   /**
    * Search places strictly within 4km of user's real GPS coordinates via live Google Places API.
-   * Never returns fake or hardcoded mock results.
+   * Never returns fake or hardcoded mock results. Cache disabled — always fetches fresh live data.
    */
   async searchPlaces(filter: SearchFilter, userCoords?: Coords): Promise<Place[]> {
     if (!userCoords) {
       return [];
     }
 
-    const cacheKey = `${filter.category}_${filter.query}_${filter.maxDistanceKm}_${filter.minRating}_${filter.openNow}_${filter.sortBy}_${userCoords.lat.toFixed(4)}_${userCoords.lng.toFixed(4)}`;
-    const cached = searchCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      return cached.data;
-    }
-
     try {
       const results = await searchGooglePlaces(filter, userCoords);
-      searchCache.set(cacheKey, { timestamp: Date.now(), data: results });
       return results;
     } catch (err) {
       console.error('Live Google Places API search error:', err);

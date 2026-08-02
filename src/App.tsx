@@ -109,10 +109,15 @@ export function App() {
   const handleManualSearchSubmit = useCallback(
     async (query: string) => {
       const activeQuery = query.trim();
-      setFilter((prev) => {
-        const parsed = activeQuery ? { query: activeQuery, category: 'all' as const } : { query: '', category: prev.category };
-        return { ...prev, ...parsed };
-      });
+      const newFilter: SearchFilter = {
+        query: activeQuery,
+        category: activeQuery ? 'all' : filter.category,
+        minRating: 0,
+        maxDistanceKm: SEARCH_RADIUS_KM,
+        openNow: false,
+        sortBy: 'rating',
+      };
+      setFilter(newFilter);
 
       if (!userCoords) {
         setAlertNotification('⚠️ Real GPS Location Required. Please allow location access.');
@@ -121,7 +126,10 @@ export function App() {
       }
 
       setAlertNotification(`🔍 Finding highest-rated "${activeQuery || 'nearby places'}" within ${SEARCH_RADIUS_KM}km...`);
-      setTimeout(() => setAlertNotification(null), 3000);
+      setTimeout(() => setAlertNotification(null), 4000);
+
+      // Fetch ALL matching places for the grid + find the single top-rated one
+      fetchPlaces(newFilter, userCoords);
 
       const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords);
       if (topPlace) {
@@ -138,7 +146,7 @@ export function App() {
         }
       }, 50);
     },
-    [userCoords, filter.category]
+    [userCoords, filter.category, fetchPlaces]
   );
 
   // Handle Category Select
