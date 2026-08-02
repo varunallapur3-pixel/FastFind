@@ -134,6 +134,11 @@ export async function searchGooglePlaces(
   await loadGoogleMaps();
 
   const location = new google.maps.LatLng(userCoords.lat, userCoords.lng);
+  const bounds = new google.maps.LatLngBounds(
+    new google.maps.LatLng(userCoords.lat - 0.04, userCoords.lng - 0.04),
+    new google.maps.LatLng(userCoords.lat + 0.04, userCoords.lng + 0.04)
+  );
+
   const mapDiv = document.createElement('div');
   const map = new google.maps.Map(mapDiv, {
     center: location,
@@ -150,63 +155,53 @@ export async function searchGooglePlaces(
   const googleType = category !== 'all' ? CATEGORY_TO_GOOGLE_TYPE[category] : undefined;
 
   if (query) {
+    // 1. Primary Text Search
     try {
-      rawResults = await runTextSearch(service, {
-        query,
-        location,
-        radius: SEARCH_RADIUS_METERS,
-      });
+      rawResults = await runTextSearch(service, { query, location, bounds, radius: SEARCH_RADIUS_METERS });
     } catch {
       rawResults = [];
     }
+    // 2. Secondary Nearby Search with Keyword
     if (rawResults.length === 0) {
       try {
-        rawResults = await runNearbySearch(service, {
-          location,
-          radius: SEARCH_RADIUS_METERS,
-          keyword: query,
-        });
+        rawResults = await runNearbySearch(service, { location, bounds, radius: SEARCH_RADIUS_METERS, keyword: query });
       } catch {
         rawResults = [];
       }
     }
   } else if (googleType) {
+    // 1. Primary Nearby Search with Type
     try {
-      rawResults = await runNearbySearch(service, {
-        location,
-        radius: SEARCH_RADIUS_METERS,
-        type: googleType,
-      });
+      rawResults = await runNearbySearch(service, { location, bounds, radius: SEARCH_RADIUS_METERS, type: googleType });
     } catch {
       rawResults = [];
     }
+    // 2. Secondary Text Search with Category Name
     if (rawResults.length === 0) {
       try {
-        rawResults = await runTextSearch(service, {
-          query: CATEGORY_LABELS[category] || category,
-          location,
-          radius: SEARCH_RADIUS_METERS,
-        });
+        rawResults = await runTextSearch(service, { query: CATEGORY_LABELS[category] || category, location, bounds, radius: SEARCH_RADIUS_METERS });
+      } catch {
+        rawResults = [];
+      }
+    }
+    // 3. Tertiary Nearby Search with Keyword
+    if (rawResults.length === 0) {
+      try {
+        rawResults = await runNearbySearch(service, { location, bounds, radius: SEARCH_RADIUS_METERS, keyword: category });
       } catch {
         rawResults = [];
       }
     }
   } else {
+    // Category === 'all' and query === ''
     try {
-      rawResults = await runTextSearch(service, {
-        query: 'hospital OR dentist OR cafe OR restaurant OR store OR pharmacy',
-        location,
-        radius: SEARCH_RADIUS_METERS,
-      });
+      rawResults = await runNearbySearch(service, { location, bounds, radius: SEARCH_RADIUS_METERS });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runNearbySearch(service, {
-          location,
-          radius: SEARCH_RADIUS_METERS,
-        });
+        rawResults = await runTextSearch(service, { query: 'hospital dentist cafe restaurant store pharmacy', location, bounds, radius: SEARCH_RADIUS_METERS });
       } catch {
         rawResults = [];
       }
@@ -219,7 +214,7 @@ export async function searchGooglePlaces(
   let places = rawResults
     .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null)
-    .filter((p) => (p.distanceKm || 0) <= maxRadiusKm);
+    .filter((p) => (p.distanceKm || 0) <= maxRadiusKm + 0.2);
 
   if (filter.minRating > 0) {
     places = places.filter((p) => p.rating >= filter.minRating);
