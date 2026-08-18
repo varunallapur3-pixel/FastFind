@@ -54,7 +54,7 @@ export interface Place {
   rating: number; // e.g. 4.9
   totalReviews: number;
   distanceMiles: number; // e.g. 0.2
-  distanceKm?: number; // e.g. 0.5 km
+  distanceKm: number; // e.g. 0.5 km
   durationMins: number; // e.g. 3
   address: string;
   phone: string;

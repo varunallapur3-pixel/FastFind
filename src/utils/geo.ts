@@ -70,43 +70,56 @@ export async function getUserLocation(): Promise<GPSLocationDetails> {
       return;
     }
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        let cityName = 'Live Device GPS';
-        try {
-          const fetchedCity = await getCityFromCoords(lat, lng);
-          if (fetchedCity && fetchedCity !== 'Your Location') {
-            cityName = fetchedCity;
-          }
-        } catch {
-          // ignore
+    const handleSuccess = async (position: GeolocationPosition) => {
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      let cityName = 'Live Device GPS';
+      try {
+        const fetchedCity = await getCityFromCoords(lat, lng);
+        if (fetchedCity && fetchedCity !== 'Your Location') {
+          cityName = fetchedCity;
         }
-        resolve({
-          lat,
-          lng,
-          accuracy: position.coords.accuracy,
-          timestamp: position.timestamp,
-          cityName,
-          source: 'gps',
-        });
-      },
-      (error) => {
-        console.warn('Browser hardware GPS error or denied:', error.message);
-        reject(error);
+      } catch {
+        // ignore
+      }
+      resolve({
+        lat,
+        lng,
+        accuracy: position.coords.accuracy,
+        timestamp: position.timestamp,
+        cityName,
+        source: 'gps',
+      });
+    };
+
+    // First attempt: High Accuracy GPS (20s timeout)
+    navigator.geolocation.getCurrentPosition(
+      handleSuccess,
+      (highAccErr) => {
+        console.warn('High-accuracy GPS failed/timed out, retrying with standard accuracy:', highAccErr.message);
+        // Fallback attempt: Standard Accuracy (Network/Cellular location)
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          (lowAccErr) => {
+            console.warn('Standard accuracy location failed:', lowAccErr.message);
+            reject(lowAccErr);
+          },
+          {
+            enableHighAccuracy: false,
+            timeout: 10000,
+            maximumAge: 60000,
+          }
+        );
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 20000,
         maximumAge: 0,
       }
     );
   });
 }
 
-/**
- * Generate Google Maps direction URL forcing origin to "My Location" (Hardware GPS)
 /**
  * Generate Google Maps direction URL forcing origin to user location and destination to exact latitude & longitude.
  * This guarantees Google Maps routes directly to the location within 4km without fuzzy text matching distant POIs.
@@ -119,7 +132,7 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  // Always use origin=My+Location so Google Maps displays "Your location" without resolving coordinates to random POIs like "VEDIC MATHS & ABACUS"
+  // Always use origin=My+Location so Google Maps displays "Your location" without resolving coordinates to random POIs
   const originParam = 'My+Location';
   const destParam = `${destLat},${destLng}`;
 

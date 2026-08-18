@@ -7,7 +7,7 @@ import {
   SEARCH_RADIUS_KM,
   GOOGLE_MAPS_API_KEY,
 } from '../config/maps';
-import { calculateDistanceKm, calculateDistanceMiles } from '../utils/geo';
+import { calculateDistanceKm, calculateDistanceMiles, getCityFromCoords } from '../utils/geo';
 import { parseSearchTarget } from '../utils/searchTarget';
 import { loadGoogleMaps } from './googleMapsLoader';
 
@@ -53,7 +53,9 @@ function googleResultToPlace(
     }
   }
 
-  const openStatus = result.opening_hours?.isOpen?.() ?? true;
+  const openStatus = typeof result.opening_hours?.isOpen === 'function' 
+    ? Boolean(result.opening_hours.isOpen()) 
+    : Boolean(result.opening_hours?.open_now);
 
   return {
     id: result.place_id,
@@ -216,23 +218,23 @@ export async function searchGooglePlaces(
       }
     }
   } else {
+    // When searching for 'all' without query, query nearby places natively by location
     try {
       rawResults = await runNearbySearch(service, {
         location,
         bounds,
         radius: searchRadiusMeters,
-        keyword: 'establishment',
       });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runNearbySearch(service, {
+        rawResults = await runTextSearch(service, {
+          query: 'popular places',
           location,
           bounds,
           radius: searchRadiusMeters,
-          keyword: 'point_of_interest',
         });
       } catch {
         rawResults = [];
@@ -244,13 +246,14 @@ export async function searchGooglePlaces(
     .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 2.0, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null);
 
-  // Fallback 1: If 0 places found within strict radius, query 10km radius with keyword establishment
+  // Fallback 1: If 0 places found within strict radius, expand radius to 10km
   if (places.length === 0) {
     try {
-      const widerResults = await runNearbySearch(service, {
+      const fallbackSearch = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'places');
+      const widerResults = await runTextSearch(service, {
+        query: fallbackSearch,
         location,
         radius: 10000,
-        keyword: query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'establishment'),
       });
       places = widerResults
         .map((r) => googleResultToPlace(r, userCoords, 999, category !== 'all' ? category : 'all'))
@@ -260,12 +263,17 @@ export async function searchGooglePlaces(
     }
   }
 
-  // Fallback 2: If still 0 places (e.g. unpopulated desktop ISP coordinate), textSearch for category/query in region
+  // Fallback 2: If still 0 places, reverse-geocode user's coordinates to dynamically resolve city name
   if (places.length === 0) {
     try {
+      const userCity = await getCityFromCoords(userCoords.lat, userCoords.lng);
       const searchQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'popular places');
+      const cityQuery = userCity && userCity !== 'Your Location' 
+        ? `${searchQuery} near ${userCity}` 
+        : `${searchQuery} near ${userCoords.lat.toFixed(3)},${userCoords.lng.toFixed(3)}`;
+      
       const globalResults = await runTextSearch(service, {
-        query: `${searchQuery} near Karnataka India`,
+        query: cityQuery,
         location,
         radius: 50000,
       });

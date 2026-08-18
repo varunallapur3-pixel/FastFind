@@ -395,8 +395,38 @@ export function App() {
           </div>
 
           {loading ? (
-            <div className="py-16 text-center font-mono text-sm text-[#00dbe9] animate-pulse">
-              CALCULATING EXACT DISTANCE FROM YOUR HARDWARE GPS...
+            <div className="py-16 text-center font-mono text-sm text-[#00dbe9] animate-pulse flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-[#00dbe9] border-t-transparent animate-spin" />
+              <span>SEARCHING GOOGLE PLACES NEAR YOUR LIVE GPS...</span>
+            </div>
+          ) : (activeView === 'favorites' ? places.filter((p) => favorites.includes(p.id)) : places).length === 0 ? (
+            <div className="py-12 px-6 rounded-2xl bg-[#131313] border border-white/10 text-center font-mono max-w-xl mx-auto my-6">
+              <div className="w-12 h-12 rounded-full bg-[#00dbe9]/10 border border-[#00dbe9]/30 text-[#00dbe9] flex items-center justify-center mx-auto mb-4">
+                <Compass className="w-6 h-6 animate-pulse" />
+              </div>
+              <h3 className="text-base font-headline font-bold text-white mb-2">
+                {gpsStatus === 'denied' ? 'GPS Location Permission Denied' : 'No Places Found Nearby'}
+              </h3>
+              <p className="text-xs text-[#849495] mb-6 leading-relaxed">
+                {gpsStatus === 'denied'
+                  ? 'Please allow location access in your mobile browser settings and click RE-SYNC GPS to discover real places near you.'
+                  : `No places matching "${filter.query || filter.category}" were found within ${filter.maxDistanceKm || 4}km of your GPS. Try selecting a category above or expanding distance.`}
+              </p>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={requestGPSLocation}
+                  className="px-4 py-2.5 rounded-xl bg-[#00dbe9] text-[#00363a] font-headline font-bold text-xs hover:bg-white transition-all cursor-pointer flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,219,233,0.3)]"
+                >
+                  <Locate className="w-4 h-4" />
+                  <span>RE-SYNC GPS</span>
+                </button>
+                <button
+                  onClick={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 0, category: 'all', query: '' }))}
+                  className="px-4 py-2.5 rounded-xl bg-white/10 text-white border border-white/15 font-mono text-xs hover:bg-white/20 transition-all cursor-pointer"
+                >
+                  SHOW ALL DISTANCES & CATEGORIES
+                </button>
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

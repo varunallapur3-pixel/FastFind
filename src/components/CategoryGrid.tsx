@@ -18,6 +18,8 @@ import {
   Stethoscope,
   Dog,
   Star,
+  Zap,
+  Wrench,
 } from 'lucide-react';
 
 interface CategoryGridProps {
@@ -36,7 +38,9 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
   grocery: ShoppingCart,
   atm: CreditCard,
   petrol: Fuel,
+  ev_charging: Zap,
   car_wash: Car,
+  mechanic: Wrench,
   hotel: Bed,
   bakery: Cake,
   gym: Dumbbell,
