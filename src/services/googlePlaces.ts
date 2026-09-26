@@ -3,15 +3,11 @@ import {
   CATEGORY_LABELS,
   CATEGORY_TO_GOOGLE_TYPE,
   GOOGLE_TYPE_TO_CATEGORY,
-  SEARCH_RADIUS_METERS,
   SEARCH_RADIUS_KM,
-  GOOGLE_MAPS_API_KEY,
 } from '../config/maps';
 import { calculateDistanceKm, calculateDistanceMiles, getCityFromCoords } from '../utils/geo';
 import { parseSearchTarget } from '../utils/searchTarget';
 import { loadGoogleMaps } from './googleMapsLoader';
-
-
 
 const DEFAULT_IMAGE =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80';
@@ -28,7 +24,7 @@ function inferCategory(types: string[] = []): CategoryId {
 function googleResultToPlace(
   result: google.maps.places.PlaceResult,
   userCoords: Coords,
-  maxRadiusKm: number = SEARCH_RADIUS_KM,
+  maxRadiusKm: number = 999,
   fallbackCategory: CategoryId = 'all'
 ): Place | null {
   if (!result.geometry?.location || !result.place_id) return null;
@@ -37,7 +33,7 @@ function googleResultToPlace(
   const lng = typeof result.geometry.location.lng === 'function' ? result.geometry.location.lng() : (result.geometry.location as any).lng;
   const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
 
-  if (distanceKm > maxRadiusKm) return null;
+  if (maxRadiusKm > 0 && distanceKm > maxRadiusKm) return null;
 
   const category =
     fallbackCategory !== 'all' ? fallbackCategory : inferCategory(result.types);
@@ -74,10 +70,10 @@ function googleResultToPlace(
     openHours: openStatus ? 'Open Now' : 'Closed',
     image,
     aiSummary: `Top-rated ${CATEGORY_LABELS[category].toLowerCase()} — ${rating}★ with ${totalReviews} reviews, ${distanceKm} km from you.`,
-    tags: [`#Within${maxRadiusKm}km`, `#${distanceKm}kmAway`],
+    tags: [`#${distanceKm}kmAway`],
     crowdDensity: Math.min(90, 20 + totalReviews / 10),
     coords: { lat, lng },
-    features: [`Within ${maxRadiusKm}km`, 'Google Places'],
+    features: [`${distanceKm} km away`, 'Google Places'],
   };
 }
 
@@ -160,15 +156,10 @@ export async function searchGooglePlaces(
   await loadGoogleMaps();
 
   const location = new google.maps.LatLng(userCoords.lat, userCoords.lng);
-  const maxRadiusKm =
+  const targetRadiusKm =
     filter.maxDistanceKm && filter.maxDistanceKm > 0 ? filter.maxDistanceKm : SEARCH_RADIUS_KM;
 
-  const searchRadiusMeters = maxRadiusKm * 1000;
-
-  const bounds = new google.maps.LatLngBounds(
-    new google.maps.LatLng(userCoords.lat - (maxRadiusKm / 111), userCoords.lng - (maxRadiusKm / 111)),
-    new google.maps.LatLng(userCoords.lat + (maxRadiusKm / 111), userCoords.lng + (maxRadiusKm / 111))
-  );
+  const searchRadiusMeters = Math.max(5000, targetRadiusKm * 1000);
 
   const mapDiv = document.createElement('div');
   const map = new google.maps.Map(mapDiv, {
@@ -183,116 +174,110 @@ export async function searchGooglePlaces(
 
   let rawResults: google.maps.places.PlaceResult[] = [];
   const googleType = category !== 'all' ? CATEGORY_TO_GOOGLE_TYPE[category] : undefined;
+  const categoryLabel = CATEGORY_LABELS[category] || category;
 
+  // Search Stage 1: Try TextSearch / NearbySearch without conflicting bounds
   if (query) {
     try {
-      rawResults = await runTextSearch(service, { query, location, bounds, radius: searchRadiusMeters });
+      rawResults = await runTextSearch(service, { query, location, radius: searchRadiusMeters });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runNearbySearch(service, { location, bounds, radius: searchRadiusMeters, keyword: query });
+        rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters, keyword: query });
       } catch {
         rawResults = [];
       }
     }
-  } else if (googleType) {
-    try {
-      rawResults = await runNearbySearch(service, { location, bounds, radius: searchRadiusMeters, type: googleType });
-    } catch {
-      rawResults = [];
-    }
-    if (rawResults.length === 0) {
+  } else if (category !== 'all') {
+    // Search by category
+    if (googleType) {
       try {
-        rawResults = await runTextSearch(service, { query: CATEGORY_LABELS[category] || category, location, bounds, radius: searchRadiusMeters });
+        rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters, type: googleType });
       } catch {
         rawResults = [];
       }
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runNearbySearch(service, { location, bounds, radius: searchRadiusMeters, keyword: category });
+        rawResults = await runTextSearch(service, { query: categoryLabel, location, radius: searchRadiusMeters });
+      } catch {
+        rawResults = [];
+      }
+    }
+    if (rawResults.length === 0) {
+      try {
+        rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters, keyword: categoryLabel });
       } catch {
         rawResults = [];
       }
     }
   } else {
-    // When searching for 'all' without query, query nearby places natively by location
+    // Search for 'all'
     try {
-      rawResults = await runNearbySearch(service, {
-        location,
-        bounds,
-        radius: searchRadiusMeters,
-      });
+      rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters });
     } catch {
       rawResults = [];
     }
     if (rawResults.length === 0) {
       try {
-        rawResults = await runTextSearch(service, {
-          query: 'popular places',
-          location,
-          bounds,
-          radius: searchRadiusMeters,
-        });
+        rawResults = await runTextSearch(service, { query: 'popular places', location, radius: searchRadiusMeters });
       } catch {
         rawResults = [];
       }
     }
   }
 
+  // Convert raw Google Places results
   let places = rawResults
-    .map((r) => googleResultToPlace(r, userCoords, maxRadiusKm + 2.0, category !== 'all' ? category : 'all'))
+    .map((r) => googleResultToPlace(r, userCoords, targetRadiusKm + 3.0, category !== 'all' ? category : 'all'))
     .filter((p): p is Place => p !== null);
 
-  // Fallback 1: If 0 places found within strict radius, expand radius to 10km
-  if (places.length === 0) {
+  // Fallback Stage 1: If fewer than 3 places found inside radius, expand radius to 15km
+  if (places.length < 3) {
     try {
-      const fallbackSearch = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'places');
+      const searchTerm = query || (category !== 'all' ? categoryLabel : 'popular places');
       const widerResults = await runTextSearch(service, {
-        query: fallbackSearch,
+        query: searchTerm,
         location,
-        radius: 10000,
+        radius: 15000,
       });
-      places = widerResults
-        .map((r) => googleResultToPlace(r, userCoords, 999, category !== 'all' ? category : 'all'))
+      const widerPlaces = widerResults
+        .map((r) => googleResultToPlace(r, userCoords, 25, category !== 'all' ? category : 'all'))
         .filter((p): p is Place => p !== null);
+
+      places = [...places, ...widerPlaces];
     } catch {
       // ignore
     }
   }
 
-  // Fallback 2: If still 0 places, reverse-geocode user's coordinates to dynamically resolve city name
-  if (places.length === 0) {
+  // Fallback Stage 2: Geocode user city text search if still fewer than 3 places
+  if (places.length < 3) {
     try {
       const userCity = await getCityFromCoords(userCoords.lat, userCoords.lng);
-      const searchQuery = query || (category !== 'all' ? (CATEGORY_LABELS[category] || category) : 'popular places');
-      const cityQuery = userCity && userCity !== 'Your Location' 
-        ? `${searchQuery} near ${userCity}` 
-        : `${searchQuery} near ${userCoords.lat.toFixed(3)},${userCoords.lng.toFixed(3)}`;
-      
-      const globalResults = await runTextSearch(service, {
+      const searchTerm = query || (category !== 'all' ? categoryLabel : 'places');
+      const cityQuery = userCity && userCity !== 'Your Location'
+        ? `${searchTerm} near ${userCity}`
+        : `${searchTerm} near ${userCoords.lat.toFixed(3)},${userCoords.lng.toFixed(3)}`;
+
+      const cityResults = await runTextSearch(service, {
         query: cityQuery,
         location,
-        radius: 50000,
+        radius: 25000,
       });
-      places = globalResults
-        .map((r) => googleResultToPlace(r, userCoords, 999, category !== 'all' ? category : 'all'))
+      const cityPlaces = cityResults
+        .map((r) => googleResultToPlace(r, userCoords, 50, category !== 'all' ? category : 'all'))
         .filter((p): p is Place => p !== null);
+
+      places = [...places, ...cityPlaces];
     } catch {
       // ignore
     }
   }
 
-  if (filter.minRating > 0) {
-    places = places.filter((p) => p.rating >= filter.minRating);
-  }
-
-  if (filter.openNow) {
-    places = places.filter((p) => p.openStatus);
-  }
-
+  // Deduplicate by place_id
   const seen = new Set<string>();
   places = places.filter((p) => {
     if (seen.has(p.id)) return false;
@@ -300,6 +285,17 @@ export async function searchGooglePlaces(
     return true;
   });
 
+  // Filter min rating if specified
+  if (filter.minRating > 0) {
+    places = places.filter((p) => p.rating >= filter.minRating);
+  }
+
+  // Filter openNow if specified
+  if (filter.openNow) {
+    places = places.filter((p) => p.openStatus);
+  }
+
+  // Sort by highest rating first
   places = sortPlaces(places, filter.sortBy);
 
   if (places.length > 0) {
@@ -333,7 +329,7 @@ export async function getGoogleTopRatedPlace(
         query,
         category,
         minRating: 0,
-        maxDistanceKm: 10,
+        maxDistanceKm: 15,
         openNow: false,
         sortBy: 'rating',
       },
