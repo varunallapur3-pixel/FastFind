@@ -132,9 +132,8 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  // Always use origin=My+Location so Google Maps displays "Your location" without resolving coordinates to random POIs
-  const originParam = 'My+Location';
+  const originParam = userLat && userLng ? `${userLat},${userLng}` : 'My+Location';
   const destParam = `${destLat},${destLng}`;
 
-  return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving`;
+  return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving&dir_action=navigate`;
 }

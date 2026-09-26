@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { CATEGORIES } from '../data/mockPlaces';
 import { CategoryId } from '../types';
 import {
@@ -17,9 +17,10 @@ import {
   Dumbbell,
   Stethoscope,
   Dog,
-  Star,
   Zap,
   Wrench,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 
 interface CategoryGridProps {
@@ -48,30 +49,44 @@ const CATEGORY_ICONS: Record<string, React.FC<{ className?: string }>> = {
   veterinary: Dog,
 };
 
+const PRIMARY_CATEGORY_IDS = new Set<CategoryId>([
+  'all',
+  'dentist',
+  'cafe',
+  'restaurant',
+  'hospital',
+  'pharmacy',
+]);
+
 export const CategoryGrid: React.FC<CategoryGridProps> = ({
   selectedCategory,
   onSelectCategory,
-  onAutoNavigateCategory,
 }) => {
+  const [showAllSecondary, setShowAllSecondary] = useState(false);
+
+  const primaryCategories = CATEGORIES.filter((c) => PRIMARY_CATEGORY_IDS.has(c.id));
+  const secondaryCategories = CATEGORIES.filter((c) => !PRIMARY_CATEGORY_IDS.has(c.id));
+
   return (
-    <section className="mb-10">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-mono text-xs text-[#b9cacb] uppercase tracking-widest flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#00dbe9] animate-pulse" />
-          <span>INSTANT CATEGORY NODES (CLICK TO FILTER NEARBY PLACES)</span>
+    <section className="mb-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Primary Categories Header */}
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
+          Popular Categories
         </h2>
         {selectedCategory !== 'all' && (
           <button
             onClick={() => onSelectCategory('all')}
-            className="text-xs font-mono text-[#00dbe9] hover:underline"
+            className="text-xs font-medium text-brand-400 hover:underline cursor-pointer"
           >
-            RESET ALL
+            Show All
           </button>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3.5">
-        {CATEGORIES.map((cat) => {
+      {/* Primary Categories - Featured Cards Grid (Mobile Horizontal Scrollable Carousel) */}
+      <div className="flex md:grid md:grid-cols-6 gap-3 overflow-x-auto pb-2 md:pb-0 scrollbar-none snap-x">
+        {primaryCategories.map((cat) => {
           const isSelected = selectedCategory === cat.id;
           const IconComponent = CATEGORY_ICONS[cat.id] || Compass;
 
@@ -84,45 +99,78 @@ export const CategoryGrid: React.FC<CategoryGridProps> = ({
                   document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
                 }, 100);
               }}
-              className={`glass-card relative flex flex-col justify-between p-4 h-32 rounded-xl group cursor-pointer border transition-all duration-300 ${
+              className={`snap-start min-w-[140px] md:min-w-0 flex-1 flex flex-col justify-between p-3.5 h-24 rounded-2xl group cursor-pointer border transition-all duration-200 ${
                 isSelected
-                  ? 'border-[#00dbe9] bg-[#00dbe9]/10 shadow-[0_0_20px_rgba(0,219,233,0.3)] scale-[1.02]'
-                  : 'border-white/10 hover:border-[#00dbe9]/60 hover:bg-white/5'
+                  ? 'bg-slate-800 border-brand-500 ring-1 ring-brand-500/50 shadow-subtle'
+                  : 'bg-[#111827] border-slate-800 hover:border-slate-700 hover:bg-slate-800/60'
               }`}
             >
-              {/* Top Row Icon */}
               <div className="flex items-center justify-between">
-                <div className={`p-2 rounded-lg bg-white/5 ${cat.iconColor} group-hover:scale-110 transition-transform`}>
-                  <IconComponent className="w-5 h-5" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectCategory(cat.id);
-                    onAutoNavigateCategory(cat.id);
-                  }}
-                  className="flex items-center text-[10px] font-mono text-[#a9f900] bg-[#a9f900]/10 px-1.5 py-0.5 rounded border border-[#a9f900]/30 opacity-80 hover:opacity-100 hover:bg-[#a9f900]/20 transition-all cursor-pointer"
-                  title={`Find top-rated ${cat.label} within 3km`}
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                    isSelected
+                      ? 'bg-brand-600 text-white'
+                      : 'bg-slate-800 text-slate-300 group-hover:text-brand-400'
+                  }`}
                 >
-                  <Star className="w-2.5 h-2.5 fill-current mr-0.5" />
-                  <span>TOP</span>
-                </button>
+                  <IconComponent className="w-4 h-4" />
+                </div>
+                {isSelected && <span className="w-2 h-2 rounded-full bg-brand-500" />}
               </div>
 
-              {/* Bottom Label */}
               <div>
-                <span className="font-mono text-xs font-bold tracking-widest text-[#e5e2e1] group-hover:text-[#00dbe9] block transition-colors">
+                <span className="text-xs font-semibold text-slate-100 block truncate group-hover:text-brand-400 transition-colors">
                   {cat.label}
                 </span>
-                <span className="text-[10px] font-mono text-[#849495] line-clamp-1 mt-0.5">
+                <span className="text-[10px] text-slate-400 line-clamp-1 block">
                   {cat.description}
                 </span>
               </div>
             </div>
           );
         })}
+      </div>
+
+      {/* Secondary Categories Accordion / Expandable Row */}
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-medium text-slate-400">More Services</span>
+          <button
+            onClick={() => setShowAllSecondary(!showAllSecondary)}
+            className="flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+          >
+            <span>{showAllSecondary ? 'Show Less' : `View All (${secondaryCategories.length})`}</span>
+            {showAllSecondary ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {/* Compact Chips for Secondary Categories */}
+        <div className="flex flex-wrap gap-2">
+          {(showAllSecondary ? secondaryCategories : secondaryCategories.slice(0, 6)).map((cat) => {
+            const isSelected = selectedCategory === cat.id;
+            const IconComponent = CATEGORY_ICONS[cat.id] || Compass;
+
+            return (
+              <button
+                key={cat.id}
+                onClick={() => {
+                  onSelectCategory(cat.id);
+                  setTimeout(() => {
+                    document.getElementById('results-section')?.scrollIntoView({ behavior: 'smooth' });
+                  }, 100);
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors cursor-pointer ${
+                  isSelected
+                    ? 'bg-slate-800 border-brand-500 text-brand-300 shadow-subtle'
+                    : 'bg-[#111827] border-slate-800 text-slate-300 hover:bg-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <IconComponent className={`w-3.5 h-3.5 ${isSelected ? 'text-brand-400' : 'text-slate-400'}`} />
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

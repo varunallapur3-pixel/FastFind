@@ -32,7 +32,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setSuccessMsg('');
 
     try {
-      // FORGOT PASSWORD FLOW
       if (isForgotPassword) {
         if (!email || !email.includes('@')) {
           throw new Error('Please enter a valid email address.');
@@ -41,13 +40,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         try {
           await sendPasswordResetEmail(auth, email);
           setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
-        } catch (fbErr: any) {
+        } catch {
           setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
         }
         return;
       }
 
-      // LOGIN FLOW
       if (!email || !email.includes('@')) {
         throw new Error('Please enter a valid email address.');
       }
@@ -55,7 +53,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
         throw new Error('Please enter your password.');
       }
 
-      // Attempt Firebase Authentication
       try {
         const res = await signInWithEmailAndPassword(auth, email, password);
         const u: User = {
@@ -63,13 +60,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           name: (res.user.displayName || email.split('@')[0]).toUpperCase(),
           email: res.user.email || email,
           token: await res.user.getIdToken(),
-          favorites: ['local_cafe_0'],
+          favorites: [],
           recentSearches: ['Cafe', 'EV Charging'],
         };
         onAuthSuccess(u);
         return;
       } catch (fbErr: any) {
-        // Handle specific Firebase password error codes
         if (fbErr.code === 'auth/wrong-password') {
           throw new Error('Incorrect password. Please check your password or click Forgot Password.');
         }
@@ -77,7 +73,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           throw new Error('No account found for this email address.');
         }
 
-        // Seamless authentication handler for user login
         const user = await api.login(email, password);
         onAuthSuccess(user);
       }
@@ -95,16 +90,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       const res = await signInWithPopup(auth, googleProvider);
       const u: User = {
         id: res.user.uid,
-        name: (res.user.displayName || 'GOOGLE OPERATOR').toUpperCase(),
-        email: res.user.email || 'google_user@findfast.ai',
+        name: res.user.displayName || 'Google User',
+        email: res.user.email || 'user@fastfind.app',
         avatar: res.user.photoURL || undefined,
         token: await res.user.getIdToken(),
-        favorites: ['local_cafe_0'],
+        favorites: [],
         recentSearches: ['Hospital', 'Dentist'],
       };
       onAuthSuccess(u);
-    } catch (err: any) {
-      const demoUser = await api.login('google_user@findfast.ai', 'demo1234');
+    } catch {
+      const demoUser = await api.login('user@fastfind.app', 'demo1234');
       onAuthSuccess(demoUser);
     } finally {
       setLoading(false);
@@ -113,73 +108,67 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
   const handleOneClickDemo = async () => {
     setLoading(true);
-    const demoUser = await api.login('operator99@findfast.ai', 'demo1234');
+    const demoUser = await api.login('demo@fastfind.app', 'demo1234');
     onAuthSuccess(demoUser);
     setLoading(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#e5e2e1] flex flex-col justify-between items-center p-4 sm:p-8 relative overflow-hidden">
-      {/* Background Scanline */}
-      <div className="scanline" />
-
-      {/* Top Brand Logo */}
-      <div className="flex items-center gap-2 pt-4">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00dbe9]/20 to-[#a9f900]/20 flex items-center justify-center border border-[#00dbe9]/50 shadow-[0_0_20px_rgba(0,219,233,0.3)]">
-          <Zap className="w-6 h-6 text-[#00dbe9] fill-[#00dbe9]" />
+    <div className="min-h-screen bg-slate-50 dark:bg-[#090d16] text-slate-900 dark:text-slate-100 flex flex-col justify-between items-center p-4 sm:p-8 relative">
+      {/* Top Brand */}
+      <div className="flex items-center gap-2.5 pt-6">
+        <div className="w-10 h-10 rounded-xl bg-brand-600 text-white flex items-center justify-center shadow-md shadow-brand-500/20">
+          <Zap className="w-6 h-6 fill-current" />
         </div>
-        <span className="font-headline font-bold text-2xl tracking-tighter text-[#00dbe9] italic">
-          FINDFAST AI
+        <span className="font-extrabold text-2xl tracking-tight">
+          FastFind
         </span>
       </div>
 
-      {/* Main Auth Hero Box */}
-      <div className="w-full max-w-md bg-[#131313]/90 backdrop-blur-2xl border-2 border-[#00dbe9]/50 rounded-2xl p-6 sm:p-8 shadow-[0_0_60px_rgba(0,219,233,0.35)] my-6 relative">
+      {/* Main Auth Card */}
+      <div className="w-full max-w-md bg-white dark:bg-[#111827] border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 shadow-elevated my-6 relative">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#a9f900]" />
-            <span className="text-xs font-mono text-[#a9f900] tracking-widest font-bold uppercase">
-              OPERATOR LOGIN
+            <ShieldCheck className="w-5 h-5 text-brand-600 dark:text-brand-400" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Account Login
             </span>
           </div>
-          <span className="text-[10px] font-mono text-[#00dbe9] border border-[#00dbe9]/30 px-2 py-0.5 rounded">
-            FIREBASE AUTH
-          </span>
         </div>
 
-        <h1 className="font-headline font-bold text-2xl text-[#e5e2e1] mb-1">
-          {isForgotPassword ? 'Reset Password' : 'Sign In to FindFast AI'}
+        <h1 className="font-bold text-2xl text-slate-900 dark:text-slate-100 mb-1">
+          {isForgotPassword ? 'Reset Password' : 'Sign In to FastFind'}
         </h1>
-        <p className="text-xs font-mono text-[#849495] mb-6">
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">
           {isForgotPassword
             ? 'Enter your registered email to receive a password reset link.'
-            : 'Enter your email address and password to sign in.'}
+            : 'Enter your credentials or test with guest access.'}
         </p>
 
         {error && (
-          <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/40 text-xs font-mono text-red-400 mb-4 animate-shake">
-            ⚠️ {error}
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-600 dark:text-rose-400 mb-4 font-medium">
+            {error}
           </div>
         )}
 
         {successMsg && (
-          <div className="p-3 rounded-xl bg-[#a9f900]/20 border border-[#a9f900]/40 text-xs font-mono text-[#a9f900] mb-4">
-            ✅ {successMsg}
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-600 dark:text-emerald-400 mb-4 font-medium">
+            {successMsg}
           </div>
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 font-mono text-xs">
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
           <div>
-            <label className="text-[#849495] block mb-1">EMAIL ADDRESS</label>
-            <div className="flex items-center bg-[#1c1b1b] border border-white/10 rounded-xl px-3.5 py-3 focus-within:border-[#00dbe9]">
-              <Mail className="w-4 h-4 text-[#00dbe9] mr-2" />
+            <label className="text-slate-600 dark:text-slate-400 font-medium block mb-1">Email Address</label>
+            <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-3 focus-within:border-brand-500">
+              <Mail className="w-4 h-4 text-slate-400 mr-2" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="OPERATOR@FINDFAST.AI"
-                className="bg-transparent border-none outline-none w-full text-[#e5e2e1] focus:ring-0"
+                placeholder="user@example.com"
+                className="bg-transparent border-none outline-none w-full text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-0"
               />
             </div>
           </div>
@@ -187,7 +176,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           {!isForgotPassword && (
             <div>
               <div className="flex justify-between items-center mb-1">
-                <label className="text-[#849495]">PASSWORD</label>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">Password</label>
                 <button
                   type="button"
                   onClick={() => {
@@ -195,19 +184,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                     setError('');
                     setSuccessMsg('');
                   }}
-                  className="text-[10px] text-[#00dbe9] hover:underline cursor-pointer"
+                  className="text-[11px] text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
                 >
-                  FORGOT PASSWORD?
+                  Forgot Password?
                 </button>
               </div>
-              <div className="flex items-center bg-[#1c1b1b] border border-white/10 rounded-xl px-3.5 py-3 focus-within:border-[#00dbe9]">
-                <Lock className="w-4 h-4 text-[#00dbe9] mr-2" />
+              <div className="flex items-center bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-3 focus-within:border-brand-500">
+                <Lock className="w-4 h-4 text-slate-400 mr-2" />
                 <input
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="bg-transparent border-none outline-none w-full text-[#e5e2e1] focus:ring-0"
+                  className="bg-transparent border-none outline-none w-full text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:ring-0"
                 />
               </div>
             </div>
@@ -216,13 +205,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-4 rounded-xl bg-[#00dbe9] hover:bg-white text-[#00363a] font-headline font-bold text-sm tracking-wider uppercase transition-all shadow-[0_0_20px_rgba(0,219,233,0.4)] active:scale-95 cursor-pointer mt-1"
+            className="w-full py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm transition-all shadow-subtle cursor-pointer mt-1"
           >
             {loading
-              ? 'SIGNING IN...'
+              ? 'Signing In...'
               : isForgotPassword
-              ? 'SEND RESET EMAIL'
-              : 'SIGN IN'}
+              ? 'Send Reset Email'
+              : 'Sign In'}
           </button>
         </form>
 
@@ -235,53 +224,52 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 setError('');
                 setSuccessMsg('');
               }}
-              className="text-xs font-mono text-[#00dbe9] hover:underline cursor-pointer flex items-center justify-center gap-1 mx-auto"
+              className="text-xs text-brand-600 dark:text-brand-400 hover:underline cursor-pointer inline-flex items-center gap-1"
             >
               <KeyRound className="w-3.5 h-3.5" />
-              <span>BACK TO SIGN IN</span>
+              <span>Back to Sign In</span>
             </button>
           </div>
         )}
 
-        {/* Google Sign In & Quick Demo Login */}
+        {/* Options */}
         {!isForgotPassword && (
-          <div className="mt-5 pt-4 border-t border-white/10 flex flex-col gap-2.5">
+          <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
             <button
               type="button"
               onClick={handleGoogleSignIn}
-              className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 text-[#e5e2e1] border border-white/15 font-mono text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <span>CONTINUE WITH GOOGLE AUTH</span>
+              <span>Continue with Google</span>
             </button>
 
             <button
               type="button"
               onClick={handleOneClickDemo}
-              className="w-full py-3 rounded-xl bg-[#a9f900]/10 hover:bg-[#a9f900]/20 text-[#a9f900] border border-[#a9f900]/30 font-mono text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
               <CheckCircle className="w-4 h-4" />
-              <span>ONE-CLICK DEMO LOGIN (OPERATOR 99)</span>
+              <span>One-Click Demo Account</span>
             </button>
           </div>
         )}
 
-        {/* Continue as Guest Button */}
+        {/* Guest */}
         <div className="mt-5 text-center">
           <button
             type="button"
             onClick={onContinueAsGuest}
-            className="inline-flex items-center gap-1.5 text-xs font-mono text-[#00dbe9] hover:text-white transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
           >
-            <Compass className="w-3.5 h-3.5" />
-            <span>CONTINUE AS GUEST OPERATOR</span>
+            <Compass className="w-4 h-4" />
+            <span>Continue as Guest</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Footer info */}
-      <div className="text-center font-mono text-[10px] text-[#849495] pb-2">
-        <span>FIREBASE AUTH • EMAIL & PASSWORD LOGIN READY</span>
+      <div className="text-center font-normal text-xs text-slate-400 pb-4">
+        <span>FastFind • Find what you need. Faster.</span>
       </div>
     </div>
   );

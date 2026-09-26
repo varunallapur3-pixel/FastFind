@@ -2,115 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --cyan-glow: rgba(0, 219, 233, 0.4);
-  --lime-glow: rgba(169, 249, 0, 0.3);
-  --magenta-glow: rgba(255, 202, 237, 0.4);
-}
+@layer base {
+  :root {
+    --color-bg-light: #f8fafc;
+    --color-card-light: #ffffff;
+    --color-border-light: #e2e8f0;
+    --color-text-light: #0f172a;
+    --color-muted-light: #64748b;
+  }
 
-body {
-  background-color: #050505;
-  color: #e5e2e1;
-  font-family: 'Geist', sans-serif;
-}
+  .dark {
+    --color-bg-dark: #090d16;
+    --color-card-dark: #111827;
+    --color-border-dark: #1f2937;
+    --color-text-dark: #f9fafb;
+    --color-muted-dark: #9ca3af;
+  }
 
-/* Custom Glassmorphism Card styling */
-.glass-card {
-  background: rgba(15, 15, 18, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.glass-card:hover {
-  border-color: rgba(0, 219, 233, 0.5);
-  box-shadow: 0 0 25px rgba(0, 219, 233, 0.25);
-  transform: translateY(-2px);
-}
-
-.glass-panel {
-  background: rgba(10, 10, 12, 0.85);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-/* Neon Text Glow */
-.neon-text-cyan {
-  text-shadow: 0 0 12px rgba(0, 219, 233, 0.8);
-}
-
-.neon-text-lime {
-  text-shadow: 0 0 12px rgba(169, 249, 0, 0.8);
-}
-
-/* Neon Border Active */
-.neon-border-active {
-  border-color: #00dbe9 !important;
-  box-shadow: inset 0 0 15px var(--cyan-glow), 0 0 20px var(--cyan-glow);
-}
-
-/* Pulsing Green Indicator */
-.pulse-green {
-  animation: pulse-green-glow 2s infinite;
-}
-
-@keyframes pulse-green-glow {
-  0% { box-shadow: 0 0 0 0 rgba(169, 249, 0, 0.7); }
-  70% { box-shadow: 0 0 0 10px rgba(169, 249, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(169, 249, 0, 0); }
-}
-
-/* Scanline Effect */
-.scanline {
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(to right, transparent, #00dbe9, transparent);
-  opacity: 0.25;
-  position: absolute;
-  top: 0;
-  left: 0;
-  animation: scan 4s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes scan {
-  0% { top: 0%; }
-  100% { top: 100%; }
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-[#090d16] dark:text-slate-100 antialiased font-sans transition-colors duration-200;
+  }
 }
 
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3b494b;
-  border-radius: 10px;
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #00dbe9;
+  background: rgba(156, 163, 175, 0.7);
 }
 
-/* Leaflet Map Dark Theme Styling */
+/* Glassmorphism Panel - Subtle & Modern */
+.panel-glass {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.dark .panel-glass {
+  background: rgba(17, 24, 39, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(31, 41, 55, 0.8);
+}
+
+/* Leaflet Map Customizations */
 .leaflet-container {
-  background: #0d1117 !important;
-  font-family: 'Geist', sans-serif !important;
+  font-family: inherit !important;
+  background: #111827 !important;
 }
 
-/* Dark mode tiles styling */
-.leaflet-tile-pane {
-  filter: brightness(0.85) contrast(1.2);
+.dark .leaflet-tile-pane {
+  filter: brightness(0.85) contrast(1.15) invert(0.9) hue-rotate(180deg) saturate(0.8);
 }
 
 .leaflet-popup-content-wrapper, .leaflet-popup-tip {
-  background: rgba(10, 10, 15, 0.95) !important;
-  color: #e5e2e1 !important;
-  backdrop-filter: blur(10px) !important;
-  border: 1px solid #00dbe9 !important;
-  box-shadow: 0 0 15px rgba(0, 219, 233, 0.4) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid #e2e8f0 !important;
+  padding: 4px !important;
+}
+
+.dark .leaflet-popup-content-wrapper, .dark .leaflet-popup-tip {
+  background: #1f2937 !important;
+  color: #f9fafb !important;
+  border: 1px solid #374151 !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5) !important;
+}
+
+.leaflet-popup-content {
+  margin: 8px 12px !important;
 }
