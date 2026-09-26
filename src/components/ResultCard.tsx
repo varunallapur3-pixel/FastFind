@@ -48,7 +48,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({
     >
       <div>
         {/* Thumbnail Image */}
-        <div className="relative h-44 w-full overflow-hidden bg-slate-800">
+        <div className="relative h-40 w-full overflow-hidden bg-slate-800">
           <img
             src={place.image}
             alt={place.name}
@@ -56,23 +56,6 @@ export const ResultCard: React.FC<ResultCardProps> = ({
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-[#111827] via-transparent to-transparent" />
-
-          {/* Save / Favorite Trigger */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleFavorite(place.id);
-            }}
-            className="absolute top-3 right-3 p-2 rounded-full bg-slate-900/70 backdrop-blur-md text-white border border-white/10 hover:bg-slate-900 active:scale-90 transition-all cursor-pointer"
-            title={isFavorite ? 'Remove from saved' : 'Save place'}
-          >
-            <Heart
-              className={`w-4 h-4 ${
-                isFavorite ? 'fill-rose-500 text-rose-500' : 'text-white'
-              }`}
-            />
-          </button>
 
           {/* Category Tag */}
           <div className="absolute top-3 left-3 bg-slate-900/80 backdrop-blur-md text-slate-200 font-medium text-[10px] px-2.5 py-1 rounded-full border border-white/10 uppercase tracking-wider">
@@ -93,30 +76,31 @@ export const ResultCard: React.FC<ResultCardProps> = ({
         </div>
 
         {/* Card Content Body */}
-        <div className="p-5">
+        <div className="p-4 sm:p-5">
           {/* Business Name */}
           <h3 className="font-bold text-lg text-slate-100 group-hover:text-brand-400 transition-colors line-clamp-1 mb-1">
             {place.name}
           </h3>
 
-          {/* Rating & Reviews */}
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex items-center gap-1 text-amber-400 font-bold text-xs">
+          {/* Rating & Distance Line (Matching ASCII: ★ 4.8 · 1.2 km) */}
+          <div className="flex items-center gap-2 mb-2 text-xs">
+            <div className="flex items-center gap-1 text-amber-400 font-bold">
               <Star className="w-3.5 h-3.5 fill-current text-amber-400" />
               <span>{place.rating}</span>
             </div>
-            <span className="text-slate-500 text-xs font-normal">
-              ({place.totalReviews} reviews)
-            </span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-400 font-medium">{place.distanceKm} km</span>
+            <span className="text-slate-600">•</span>
+            <span className="text-slate-500 font-normal">({place.totalReviews} reviews)</span>
           </div>
 
           {/* Address */}
-          <p className="text-xs text-slate-400 mb-3 line-clamp-1">
+          <p className="text-xs text-slate-400 mb-2 line-clamp-1">
             {place.address}
           </p>
 
           {/* Open Status Indicator */}
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2">
             <span
               className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium ${
                 place.openStatus
@@ -129,18 +113,18 @@ export const ResultCard: React.FC<ResultCardProps> = ({
                   place.openStatus ? 'bg-emerald-500' : 'bg-rose-500'
                 }`}
               />
-              {place.openStatus ? 'Open Now' : 'Closed'}
+              {place.openStatus ? 'Open now' : 'Closed'}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Footer Actions */}
-      <div className="px-5 pb-5 pt-2 grid grid-cols-2 gap-2 border-t border-slate-800/80">
+      {/* Action Row: [Directions] [♡] */}
+      <div className="px-4 pb-4 pt-2 flex items-center gap-2 border-t border-slate-800/80">
         <button
           type="button"
           onClick={openDirections}
-          className="flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-subtle active:scale-95 transition-all cursor-pointer"
+          className="flex-1 flex items-center justify-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs py-2.5 rounded-xl shadow-subtle active:scale-95 transition-all cursor-pointer"
           title="Open directions in Google Maps"
         >
           <Navigation className="w-3.5 h-3.5 fill-current" />
@@ -154,14 +138,14 @@ export const ResultCard: React.FC<ResultCardProps> = ({
             e.stopPropagation();
             onToggleFavorite(place.id);
           }}
-          className={`flex items-center justify-center gap-1.5 font-medium text-xs py-2.5 rounded-xl border active:scale-95 transition-all cursor-pointer ${
+          className={`w-10 h-10 flex items-center justify-center rounded-xl border active:scale-90 transition-all cursor-pointer shrink-0 ${
             isFavorite
-              ? 'bg-rose-500/10 text-rose-400 border-rose-500/30'
-              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+              ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+              : 'bg-slate-800 hover:bg-slate-700 text-slate-400 border-slate-700 hover:text-white'
           }`}
+          title={isFavorite ? 'Remove from saved' : 'Save place'}
         >
-          <Heart className={`w-3.5 h-3.5 ${isFavorite ? 'fill-rose-500 text-rose-500' : 'text-slate-400'}`} />
-          <span>{isFavorite ? 'Saved' : 'Save'}</span>
+          <Heart className={`w-4 h-4 ${isFavorite ? 'fill-rose-500 text-rose-500' : 'currentColor'}`} />
         </button>
       </div>
     </article>
