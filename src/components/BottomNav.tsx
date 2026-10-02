@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActiveView } from '../types';
-import { Search, Compass, Heart, Bell, MapPin } from 'lucide-react';
+import { Search, Compass, Heart, User as UserIcon } from 'lucide-react';
 
 interface BottomNavProps {
   activeView: ActiveView;
@@ -24,6 +24,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               ? 'text-brand-600 dark:text-brand-400 font-semibold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
+          aria-label="Home search view"
         >
           <Search className="w-5 h-5" />
           <span className="text-[10px] mt-1 font-medium">Search</span>
@@ -37,12 +38,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               ? 'text-brand-600 dark:text-brand-400 font-semibold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
+          aria-label="Explore categories"
         >
           <Compass className="w-5 h-5" />
           <span className="text-[10px] mt-1 font-medium">Explore</span>
         </button>
 
-        {/* Favorites */}
+        {/* Saved Favorites */}
         <button
           onClick={() => onChangeView('favorites')}
           className={`relative flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
@@ -50,6 +52,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               ? 'text-rose-600 dark:text-rose-400 font-semibold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
+          aria-label="Saved favorite places"
         >
           <Heart className="w-5 h-5" />
           <span className="text-[10px] mt-1 font-medium">Saved</span>
@@ -60,17 +63,18 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           )}
         </button>
 
-        {/* Alerts */}
+        {/* Account / Profile */}
         <button
-          onClick={() => onChangeView('alerts')}
+          onClick={() => onChangeView('profile')}
           className={`flex flex-col items-center justify-center flex-1 py-1 transition-colors cursor-pointer ${
-            activeView === 'alerts'
+            activeView === 'profile'
               ? 'text-brand-600 dark:text-brand-400 font-semibold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           }`}
+          aria-label="User account profile"
         >
-          <Bell className="w-5 h-5" />
-          <span className="text-[10px] mt-1 font-medium">Alerts</span>
+          <UserIcon className="w-5 h-5" />
+          <span className="text-[10px] mt-1 font-medium">Account</span>
         </button>
       </div>
     </nav>

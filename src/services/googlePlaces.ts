@@ -3,9 +3,10 @@ import {
   CATEGORY_LABELS,
   CATEGORY_TO_GOOGLE_TYPE,
   GOOGLE_TYPE_TO_CATEGORY,
-  SEARCH_RADIUS_KM,
+  DEFAULT_RADIUS_KM,
+  normalizeRadius,
 } from '../config/maps';
-import { calculateDistanceKm, calculateDistanceMiles, getCityFromCoords } from '../utils/geo';
+import { calculateDistanceKm, calculateDistanceMiles, getCityFromCoords, isValidCoords, isWithinRadius, sanitizeWebUrl } from '../utils/geo';
 import { parseSearchTarget } from '../utils/searchTarget';
 import { loadGoogleMaps } from './googleMapsLoader';
 
@@ -24,21 +25,26 @@ function inferCategory(types: string[] = []): CategoryId {
 function googleResultToPlace(
   result: google.maps.places.PlaceResult,
   userCoords: Coords,
-  maxRadiusKm: number = 999,
+  maxRadiusKm: number = DEFAULT_RADIUS_KM,
   fallbackCategory: CategoryId = 'all'
 ): Place | null {
   if (!result.geometry?.location || !result.place_id) return null;
 
   const lat = typeof result.geometry.location.lat === 'function' ? result.geometry.location.lat() : (result.geometry.location as any).lat;
   const lng = typeof result.geometry.location.lng === 'function' ? result.geometry.location.lng() : (result.geometry.location as any).lng;
-  const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
 
-  if (maxRadiusKm > 0 && distanceKm > maxRadiusKm) return null;
+  if (!isValidCoords(lat, lng)) return null;
+
+  const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
+  const strictMaxRadius = normalizeRadius(maxRadiusKm);
+
+  // STRICT DISTANCE FILTERING: reject any place strictly greater than selected radius
+  if (distanceKm > strictMaxRadius) return null;
 
   const category =
     fallbackCategory !== 'all' ? fallbackCategory : inferCategory(result.types);
-  const rating = result.rating ?? 4.5;
-  const totalReviews = result.user_ratings_total ?? 25;
+  const rating = result.rating ?? 4.0;
+  const totalReviews = result.user_ratings_total ?? 0;
 
   let image = DEFAULT_IMAGE;
   if (result.photos?.[0]) {
@@ -53,9 +59,11 @@ function googleResultToPlace(
     ? Boolean(result.opening_hours.isOpen()) 
     : Boolean(result.opening_hours?.open_now ?? true);
 
+  const website = sanitizeWebUrl(result.website);
+
   return {
     id: result.place_id,
-    name: result.name || 'Local Destination',
+    name: result.name || 'Local Place',
     category,
     categoryLabel: CATEGORY_LABELS[category] || 'PLACE',
     rating,
@@ -65,27 +73,32 @@ function googleResultToPlace(
     durationMins: Math.max(1, Math.round(distanceKm * 2.5)),
     address: result.vicinity || result.formatted_address || 'Address unavailable',
     phone: result.formatted_phone_number || '',
-    website: result.website || 'https://maps.google.com',
+    website: website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.name || 'place')}&query_place_id=${result.place_id}`,
     openStatus,
     openHours: openStatus ? 'Open Now' : 'Closed',
     image,
-    aiSummary: `Top-rated ${CATEGORY_LABELS[category].toLowerCase()} — ${rating}★ with ${totalReviews} reviews, ${distanceKm} km from you.`,
+    aiSummary: `${CATEGORY_LABELS[category]} — ${rating}★ (${totalReviews} reviews), ${distanceKm} km away.`,
     tags: [`#${distanceKm}kmAway`],
-    crowdDensity: Math.min(90, 20 + totalReviews / 10),
+    crowdDensity: 0,
     coords: { lat, lng },
-    features: [`${distanceKm} km away`, 'Verified Location'],
+    features: [`${distanceKm} km away`],
   };
 }
 
 function sortPlaces(results: Place[], sortBy: SearchFilter['sortBy']): Place[] {
   const sorted = [...results];
   if (sortBy === 'distance') {
-    sorted.sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+    sorted.sort((a, b) => {
+      if (a.distanceKm !== b.distanceKm) return a.distanceKm - b.distanceKm;
+      if (b.rating !== a.rating) return b.rating - a.rating;
+      return b.totalReviews - a.totalReviews;
+    });
   } else {
+    // Highest Rated: rating desc -> totalReviews desc -> distance asc
     sorted.sort((a, b) => {
       if (b.rating !== a.rating) return b.rating - a.rating;
       if (b.totalReviews !== a.totalReviews) return b.totalReviews - a.totalReviews;
-      return (a.distanceKm || 0) - (b.distanceKm || 0);
+      return a.distanceKm - b.distanceKm;
     });
   }
   return sorted;
@@ -127,12 +140,15 @@ function runTextSearch(
 
 /**
  * OpenStreetMap Nominatim Fallback Provider
- * Ensures real local places are returned even if Google Places API is restricted, pending activation, or sparse.
+ * Ensures real local places are returned even if Google Places API is restricted or unavailable.
+ * STRICTLY respects maxDistanceKm - filters out any result > selected radius.
  */
 export async function fetchOsmFallbackPlaces(
   filter: SearchFilter,
   userCoords: Coords
 ): Promise<Place[]> {
+  const targetRadiusKm = normalizeRadius(filter.maxDistanceKm);
+
   try {
     const userCity = await getCityFromCoords(userCoords.lat, userCoords.lng);
     const categoryLabel = CATEGORY_LABELS[filter.category] || filter.category;
@@ -142,7 +158,7 @@ export async function fetchOsmFallbackPlaces(
       ? `${searchTerm} near ${userCity}`
       : `${searchTerm}`;
 
-    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryStr)}&format=json&addressdetails=1&limit=20`, {
+    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(queryStr)}&format=json&addressdetails=1&limit=30`, {
       headers: { 'Accept-Language': 'en' },
     });
 
@@ -150,44 +166,50 @@ export async function fetchOsmFallbackPlaces(
     const data = await res.json();
     if (!Array.isArray(data)) return [];
 
-    const places: Place[] = data.map((item: any, idx: number) => {
+    const places: Place[] = [];
+
+    for (let idx = 0; idx < data.length; idx++) {
+      const item = data[idx];
       const lat = parseFloat(item.lat);
       const lng = parseFloat(item.lon);
+
+      if (!isValidCoords(lat, lng)) continue;
+
       const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
+
+      // STRICT RADIUS FILTERING FOR OSM FALLBACK
+      if (distanceKm > targetRadiusKm) continue;
+
       const addressParts = item.address || {};
       const rawName = item.name || addressParts.amenity || addressParts.shop || addressParts.road || `${categoryLabel} #${idx + 1}`;
       const name = rawName.charAt(0).toUpperCase() + rawName.slice(1);
       const address = item.display_name?.split(',').slice(0, 3).join(',') || `${userCity}`;
 
-      const baseRating = 4.5 + ((item.place_id % 5) * 0.1);
-      const rating = Math.round(baseRating * 10) / 10;
-      const totalReviews = 35 + (item.place_id % 150);
-
       const category = filter.category !== 'all' ? filter.category : inferCategory([item.type, item.class]);
 
-      return {
+      places.push({
         id: `osm_${item.place_id}`,
         name,
         category,
         categoryLabel: CATEGORY_LABELS[category] || 'PLACE',
-        rating,
-        totalReviews,
+        rating: 4.2,
+        totalReviews: 12,
         distanceKm,
         distanceMiles: calculateDistanceMiles(userCoords.lat, userCoords.lng, lat, lng),
         durationMins: Math.max(1, Math.round(distanceKm * 2.5)),
         address,
-        phone: '+91 80 2345 6789',
-        website: 'https://maps.google.com',
+        phone: item.address?.phone || '',
+        website: sanitizeWebUrl(item.extratags?.website) || `https://www.openstreetmap.org/${item.osm_type}/${item.osm_id}`,
         openStatus: true,
         openHours: 'Open Now',
         image: DEFAULT_IMAGE,
-        aiSummary: `Top-rated ${CATEGORY_LABELS[category].toLowerCase()} in ${userCity} — ${rating}★ with ${totalReviews} reviews, ${distanceKm} km from you.`,
-        tags: [`#${userCity}`, `#${distanceKm}kmAway`],
-        crowdDensity: 45,
+        aiSummary: `${CATEGORY_LABELS[category]} in ${userCity} — ${distanceKm} km away.`,
+        tags: [`#${distanceKm}kmAway`],
+        crowdDensity: 0,
         coords: { lat, lng },
-        features: [`${distanceKm} km away`, 'Verified Location'],
-      };
-    });
+        features: [`${distanceKm} km away`],
+      });
+    }
 
     return sortPlaces(places, filter.sortBy);
   } catch (err) {
@@ -224,8 +246,7 @@ export async function searchGooglePlaces(
   filter: SearchFilter,
   userCoords: Coords
 ): Promise<Place[]> {
-  const targetRadiusKm =
-    filter.maxDistanceKm && filter.maxDistanceKm > 0 ? filter.maxDistanceKm : SEARCH_RADIUS_KM;
+  const targetRadiusKm = normalizeRadius(filter.maxDistanceKm);
 
   let places: Place[] = [];
 
@@ -233,7 +254,7 @@ export async function searchGooglePlaces(
     await loadGoogleMaps();
 
     const location = new google.maps.LatLng(userCoords.lat, userCoords.lng);
-    const searchRadiusMeters = Math.max(5000, targetRadiusKm * 1000);
+    const searchRadiusMeters = Math.max(1000, Math.round(targetRadiusKm * 1000));
 
     const mapDiv = document.createElement('div');
     const map = new google.maps.Map(mapDiv, {
@@ -287,7 +308,7 @@ export async function searchGooglePlaces(
     }
 
     places = rawResults
-      .map((r) => googleResultToPlace(r, userCoords, targetRadiusKm + 5.0, category !== 'all' ? category : 'all'))
+      .map((r) => googleResultToPlace(r, userCoords, targetRadiusKm, category !== 'all' ? category : 'all'))
       .filter((p): p is Place => p !== null);
   } catch (err) {
     console.warn('Google Places JS API search encountered an error, activating OSM fallback:', err);
@@ -295,7 +316,7 @@ export async function searchGooglePlaces(
 
   // Fallback to OSM Nominatim if Google Places API returns 0 results or throws error
   if (places.length === 0) {
-    places = await fetchOsmFallbackPlaces(filter, userCoords);
+    places = await fetchOsmFallbackPlaces({ ...filter, maxDistanceKm: targetRadiusKm }, userCoords);
   }
 
   // Deduplicate by place_id
@@ -305,6 +326,9 @@ export async function searchGooglePlaces(
     seen.add(p.id);
     return true;
   });
+
+  // Client-side strict distance re-filter (Guarantees <= targetRadiusKm)
+  places = places.filter((p) => p.distanceKm <= targetRadiusKm);
 
   if (filter.minRating > 0) {
     places = places.filter((p) => p.rating >= filter.minRating);
@@ -325,8 +349,10 @@ export async function searchGooglePlaces(
 
 export async function getGoogleTopRatedPlace(
   queryOrCategory: string,
-  userCoords: Coords
+  userCoords: Coords,
+  maxRadiusKm?: number
 ): Promise<Place | null> {
+  const targetRadiusKm = normalizeRadius(maxRadiusKm);
   const { query, category } = parseSearchTarget(queryOrCategory);
 
   let results = await searchGooglePlaces(
@@ -334,7 +360,7 @@ export async function getGoogleTopRatedPlace(
       query,
       category,
       minRating: 0,
-      maxDistanceKm: SEARCH_RADIUS_KM,
+      maxDistanceKm: targetRadiusKm,
       openNow: false,
       sortBy: 'rating',
     },

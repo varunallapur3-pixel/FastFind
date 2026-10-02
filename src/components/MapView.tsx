@@ -11,6 +11,7 @@ interface MapViewProps {
   hoveredPlace?: Place | null;
   onSelectPlace: (place: Place) => void;
   userCoords?: { lat: number; lng: number } | null;
+  activeRadiusKm?: number;
   heightClass?: string;
 }
 
@@ -20,11 +21,13 @@ export const MapView: React.FC<MapViewProps> = ({
   hoveredPlace,
   onSelectPlace,
   userCoords,
+  activeRadiusKm = 4,
   heightClass = 'h-full',
 }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const leafletMap = useRef<L.Map | null>(null);
   const markersGroup = useRef<L.LayerGroup | null>(null);
+  const circleLayer = useRef<L.Circle | null>(null);
   const polylineLayer = useRef<L.Polyline | null>(null);
   const [routeInfo, setRouteInfo] = useState<{ duration: string; distance: string } | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -54,6 +57,34 @@ export const MapView: React.FC<MapViewProps> = ({
       leafletMap.current.panTo([userCoords.lat, userCoords.lng]);
     }
   }, [userCoords?.lat, userCoords?.lng]);
+
+  // Render Active Radius Circle around User Location
+  useEffect(() => {
+    const map = leafletMap.current;
+    if (!map || !userCoords) return;
+
+    if (circleLayer.current) {
+      map.removeLayer(circleLayer.current);
+      circleLayer.current = null;
+    }
+
+    const radiusMeters = Math.max(100, (activeRadiusKm || 4) * 1000);
+    circleLayer.current = L.circle([userCoords.lat, userCoords.lng], {
+      radius: radiusMeters,
+      color: '#0275c8',
+      weight: 1.5,
+      dashArray: '5, 5',
+      fillColor: '#0275c8',
+      fillOpacity: 0.08,
+    }).addTo(map);
+
+    return () => {
+      if (circleLayer.current && leafletMap.current) {
+        leafletMap.current.removeLayer(circleLayer.current);
+        circleLayer.current = null;
+      }
+    };
+  }, [userCoords?.lat, userCoords?.lng, activeRadiusKm]);
 
   // Update Place Markers & Synchronized Hover/Selected state
   useEffect(() => {

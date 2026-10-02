@@ -13,6 +13,7 @@ interface HeroSectionProps {
   locationLabel?: string;
   onRequestGPS?: () => void;
   gpsLocked?: boolean;
+  activeRadiusKm?: number;
 }
 
 export const HeroSection: React.FC<HeroSectionProps> = ({
@@ -23,6 +24,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onManualSearchSubmit,
   locationLabel,
   onRequestGPS,
+  activeRadiusKm = 4,
 }) => {
   return (
     <section className="relative pt-6 pb-6 md:pt-10 md:pb-8 text-center max-w-4xl mx-auto px-4">
@@ -34,7 +36,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
       {/* Main Headline */}
       <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-white mb-3 leading-[1.15]">
-        Find what you need.{' '}
+        Find highly rated places near you.{' '}
         <span className="bg-gradient-to-r from-brand-400 via-sky-400 to-indigo-400 bg-clip-text text-transparent">
           Faster.
         </span>
@@ -42,7 +44,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
 
       {/* Supporting Description */}
       <p className="text-sm sm:text-base text-slate-400 max-w-xl mx-auto mb-6 font-normal leading-relaxed">
-        Discover highly rated places near you and get there faster.
+        Discover top-rated places strictly within your selected distance radius.
       </p>
 
       {/* Large Primary Search Box */}
@@ -65,7 +67,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
         <span className="text-slate-700">•</span>
         <div className="flex items-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Strict {SEARCH_RADIUS_KM}km Radius</span>
+          <span>Strict {activeRadiusKm} km Radius</span>
         </div>
       </div>
     </section>

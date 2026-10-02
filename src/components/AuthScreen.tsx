@@ -39,42 +39,40 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
         try {
           await sendPasswordResetEmail(auth, email);
-          setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
         } catch {
-          setSuccessMsg(`Password reset link sent to ${email}! Please check your inbox.`);
+          // Ignore error details to prevent email enumeration
         }
+        setSuccessMsg(`If an account exists for ${email}, a password reset link has been sent.`);
         return;
       }
 
       if (!email || !email.includes('@')) {
         throw new Error('Please enter a valid email address.');
       }
-      if (!password || password.length < 3) {
-        throw new Error('Please enter your password.');
+      if (!password || password.length < 6) {
+        throw new Error('Password must be at least 6 characters.');
       }
 
       try {
         const res = await signInWithEmailAndPassword(auth, email, password);
+        const token = await res.user.getIdToken();
         const u: User = {
           id: res.user.uid,
           name: (res.user.displayName || email.split('@')[0]).toUpperCase(),
           email: res.user.email || email,
-          token: await res.user.getIdToken(),
+          token,
           favorites: [],
-          recentSearches: ['Cafe', 'EV Charging'],
+          recentSearches: [],
         };
         onAuthSuccess(u);
-        return;
       } catch (fbErr: any) {
-        if (fbErr.code === 'auth/wrong-password') {
-          throw new Error('Incorrect password. Please check your password or click Forgot Password.');
+        if (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/user-not-found' || fbErr.code === 'auth/invalid-credential') {
+          throw new Error('Invalid email or password. Please try again or click Forgot Password.');
         }
-        if (fbErr.code === 'auth/user-not-found') {
-          throw new Error('No account found for this email address.');
+        if (fbErr.code === 'auth/too-many-requests') {
+          throw new Error('Access temporarily disabled due to too many failed attempts. Try again later.');
         }
-
-        const user = await api.login(email, password);
-        onAuthSuccess(user);
+        throw new Error(fbErr.message || 'Authentication failed. Please check your credentials.');
       }
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your email and password.');
@@ -88,29 +86,24 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     setError('');
     try {
       const res = await signInWithPopup(auth, googleProvider);
+      const token = await res.user.getIdToken();
       const u: User = {
         id: res.user.uid,
         name: res.user.displayName || 'Google User',
         email: res.user.email || 'user@fastfind.app',
         avatar: res.user.photoURL || undefined,
-        token: await res.user.getIdToken(),
+        token,
         favorites: [],
-        recentSearches: ['Hospital', 'Dentist'],
+        recentSearches: [],
       };
       onAuthSuccess(u);
-    } catch {
-      const demoUser = await api.login('user@fastfind.app', 'demo1234');
-      onAuthSuccess(demoUser);
+    } catch (err: any) {
+      if (err.code !== 'auth/popup-closed-by-user') {
+        setError('Google sign-in could not be completed. Please try again or continue as Guest.');
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleOneClickDemo = async () => {
-    setLoading(true);
-    const demoUser = await api.login('demo@fastfind.app', 'demo1234');
-    onAuthSuccess(demoUser);
-    setLoading(false);
   };
 
   return (
@@ -245,24 +238,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
             <button
               type="button"
-              onClick={handleOneClickDemo}
+              onClick={onContinueAsGuest}
               className="w-full py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <CheckCircle className="w-4 h-4" />
-              <span>One-Click Demo Account</span>
+              <Compass className="w-4 h-4" />
+              <span>Explore in Guest Mode</span>
             </button>
           </div>
         )}
 
-        {/* Guest */}
-        <div className="mt-5 text-center">
+        {/* Guest Footer Link */}
+        <div className="mt-4 text-center">
           <button
             type="button"
             onClick={onContinueAsGuest}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:underline cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
           >
-            <Compass className="w-4 h-4" />
-            <span>Continue as Guest</span>
+            <span>Skip sign in & continue to discovery</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

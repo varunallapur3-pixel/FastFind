@@ -1,14 +1,12 @@
 import { Place, SearchFilter, User, Coords } from '../types';
-import { SEARCH_RADIUS_KM } from '../config/maps';
+import { DEFAULT_RADIUS_KM, normalizeRadius } from '../config/maps';
 import { searchGooglePlaces, getGoogleTopRatedPlace } from './googlePlaces';
 import { parseSearchTarget } from '../utils/searchTarget';
-
-let userFavorites: string[] = [];
+import { getSavedFavorites, saveFavorites } from '../utils/storage';
 
 export const api = {
   /**
-   * Search places strictly within 4km of user's real GPS coordinates via live Google Places API.
-   * Never returns fake or hardcoded mock results. Cache disabled — always fetches fresh live data.
+   * Search places strictly within maxDistanceKm of user's coordinates via live Google Places API.
    */
   async searchPlaces(filter: SearchFilter, userCoords?: Coords): Promise<Place[]> {
     if (!userCoords) {
@@ -25,13 +23,18 @@ export const api = {
   },
 
   /**
-   * Get the highest-rated place within 4km for a query or category using live Google Places API.
+   * Get the highest-rated place within selected maxRadiusKm for a query or category using live Google Places API.
    */
-  async getTopRatedPlace(queryOrCategory: string, userCoords?: Coords): Promise<Place | null> {
+  async getTopRatedPlace(
+    queryOrCategory: string,
+    userCoords?: Coords,
+    maxRadiusKm: number = DEFAULT_RADIUS_KM
+  ): Promise<Place | null> {
     if (!userCoords) return null;
+    const targetRadiusKm = normalizeRadius(maxRadiusKm);
 
     try {
-      return await getGoogleTopRatedPlace(queryOrCategory, userCoords);
+      return await getGoogleTopRatedPlace(queryOrCategory, userCoords, targetRadiusKm);
     } catch (err) {
       console.error('Live Google Places top-rated lookup error:', err);
       const { query, category } = parseSearchTarget(queryOrCategory);
@@ -40,7 +43,7 @@ export const api = {
           query,
           category,
           minRating: 0,
-          maxDistanceKm: SEARCH_RADIUS_KM,
+          maxDistanceKm: targetRadiusKm,
           openNow: false,
           sortBy: 'rating',
         },
@@ -50,34 +53,16 @@ export const api = {
     }
   },
 
-  async toggleFavorite(placeId: string): Promise<string[]> {
-    if (userFavorites.includes(placeId)) {
-      userFavorites = userFavorites.filter((id) => id !== placeId);
+  async toggleFavorite(placeId: string, userId?: string): Promise<string[]> {
+    const key = userId ? `fastfind_favs_${userId}` : 'fastfind_saved_places';
+    const current = getSavedFavorites(key);
+    let updated: string[];
+    if (current.includes(placeId)) {
+      updated = current.filter((id) => id !== placeId);
     } else {
-      userFavorites = [...userFavorites, placeId];
+      updated = [...current, placeId];
     }
-    return [...userFavorites];
-  },
-
-  async login(email: string, pass: string): Promise<User> {
-    return {
-      id: 'usr_' + Date.now(),
-      name: email.split('@')[0].toUpperCase() || 'USER',
-      email,
-      token: 'jwt_token_' + Date.now(),
-      favorites: [...userFavorites],
-      recentSearches: [],
-    };
-  },
-
-  async signup(name: string, email: string, pass: string): Promise<User> {
-    return {
-      id: 'usr_' + Date.now(),
-      name: name.toUpperCase(),
-      email,
-      token: 'jwt_token_new_user',
-      favorites: [],
-      recentSearches: [],
-    };
+    saveFavorites(updated, key);
+    return updated;
   },
 };

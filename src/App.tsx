@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Place, CategoryId, User, ActiveView, SearchFilter, Coords } from './types';
 import { api } from './services/api';
 import { geocodeLocation } from './services/googlePlaces';
 import { getUserLocation } from './utils/geo';
-import { SEARCH_RADIUS_KM } from './config/maps';
+import { DEFAULT_RADIUS_KM, normalizeRadius } from './config/maps';
+import { auth } from './config/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { HeaderNavbar } from './components/HeaderNavbar';
 import { HeroSection } from './components/HeroSection';
 import { CategoryGrid } from './components/CategoryGrid';
@@ -32,6 +34,9 @@ export function App() {
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Request counter to cancel stale search responses (Race condition protection)
+  const requestIdRef = useRef(0);
+
   // View & Interaction States
   const [activeView, setActiveView] = useState<ActiveView>('home');
   const [showMobileMap, setShowMobileMap] = useState(false);
@@ -42,15 +47,38 @@ export function App() {
   const [favorites, setFavorites] = useState<string[]>(() => getSavedFavorites());
   const [alertNotification, setAlertNotification] = useState<string | null>(null);
 
-  // Search Filter State (defaults to 4 km radius)
+  // Search Filter State (defaults strictly to 4 km radius)
   const [filter, setFilter] = useState<SearchFilter>({
     query: '',
     category: 'all',
     minRating: 0,
-    maxDistanceKm: SEARCH_RADIUS_KM,
+    maxDistanceKm: DEFAULT_RADIUS_KM,
     openNow: false,
     sortBy: 'rating',
   });
+
+  // Listen for Firebase Auth Persistence State
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        const token = await fbUser.getIdToken();
+        const favKey = `fastfind_favs_${fbUser.uid}`;
+        const userFavs = getSavedFavorites(favKey);
+        setUser({
+          id: fbUser.uid,
+          name: (fbUser.displayName || fbUser.email?.split('@')[0] || 'User').toUpperCase(),
+          email: fbUser.email || '',
+          avatar: fbUser.photoURL || undefined,
+          token,
+          favorites: userFavs,
+          recentSearches: [],
+        });
+        setFavorites(userFavs);
+        setHasStarted(true);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Request user location via browser native GPS prompt
   const requestGPSLocation = useCallback(async () => {
@@ -94,21 +122,30 @@ export function App() {
     }
   };
 
-  // Fetch places centered on userCoords using live Google Places API
+  // Fetch places centered on userCoords with Race Condition protection
   const fetchPlaces = useCallback(async (currentFilter: SearchFilter, coords: Coords | null) => {
     if (!coords) {
       setPlaces([]);
       return;
     }
+
+    const currentReqId = ++requestIdRef.current;
     setLoading(true);
+
     try {
       const results = await api.searchPlaces(currentFilter, coords);
-      setPlaces(results);
+      if (currentReqId === requestIdRef.current) {
+        setPlaces(results);
+      }
     } catch (err) {
       console.error('Search places error:', err);
-      setPlaces([]);
+      if (currentReqId === requestIdRef.current) {
+        setPlaces([]);
+      }
     } finally {
-      setLoading(false);
+      if (currentReqId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
@@ -118,7 +155,7 @@ export function App() {
     }
   }, [filter, userCoords, fetchPlaces, hasStarted]);
 
-  // Handle Search Input Change
+  // Handle Search Input Change (PRESERVES ACTIVE RADIUS)
   const handleSearch = useCallback((query: string) => {
     setFilter((prev) => {
       const nextCategory = query.trim() !== '' ? 'all' : prev.category;
@@ -131,19 +168,16 @@ export function App() {
     });
   }, []);
 
-  // Handle Manual Search Submit — find highest-rated place within radius
+  // Handle Manual Search Submit (STRICTLY PRESERVES USER SELECTED RADIUS)
   const handleManualSearchSubmit = useCallback(
     async (query: string) => {
       const activeQuery = query.trim();
-      const newFilter: SearchFilter = {
+
+      setFilter((prev) => ({
+        ...prev,
         query: activeQuery,
-        category: activeQuery ? 'all' : filter.category,
-        minRating: 0,
-        maxDistanceKm: SEARCH_RADIUS_KM,
-        openNow: false,
-        sortBy: 'rating',
-      };
-      setFilter(newFilter);
+        category: activeQuery ? 'all' : prev.category,
+      }));
 
       if (!userCoords) {
         setAlertNotification('⚠️ Please allow location access to search nearby places.');
@@ -151,12 +185,10 @@ export function App() {
         return;
       }
 
-      setAlertNotification(`🔍 Searching "${activeQuery || 'nearby places'}"...`);
+      setAlertNotification(`🔍 Searching "${activeQuery || 'nearby places'}" within ${filter.maxDistanceKm} km...`);
       setTimeout(() => setAlertNotification(null), 3000);
 
-      fetchPlaces(newFilter, userCoords);
-
-      const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords);
+      const topPlace = await api.getTopRatedPlace(activeQuery || filter.category, userCoords, filter.maxDistanceKm);
       if (topPlace) {
         setAutoNavPlace(topPlace);
       }
@@ -168,10 +200,10 @@ export function App() {
         }
       }, 100);
     },
-    [userCoords, filter.category, fetchPlaces]
+    [userCoords, filter.category, filter.maxDistanceKm]
   );
 
-  // Handle Category Select
+  // Handle Category Select (PRESERVES ACTIVE RADIUS)
   const handleSelectCategory = useCallback((cat: CategoryId) => {
     setFilter((prev) => {
       if (prev.category === cat && prev.query === '') return prev;
@@ -189,24 +221,35 @@ export function App() {
       setTimeout(() => setAlertNotification(null), 3000);
       return;
     }
-    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords);
+    const activeRadius = filter.maxDistanceKm ?? DEFAULT_RADIUS_KM;
+    const topPlace = await api.getTopRatedPlace(searchTermOrCat, userCoords, activeRadius);
     if (topPlace) {
       setAutoNavPlace(topPlace);
     } else {
-      setAlertNotification(`No top match found within ${SEARCH_RADIUS_KM}km.`);
+      setAlertNotification(`No top match found within ${activeRadius} km.`);
       setTimeout(() => setAlertNotification(null), 3000);
     }
   };
 
   // Toggle Favorite
   const handleToggleFavorite = async (placeId: string) => {
-    const updated = await api.toggleFavorite(placeId);
+    const updated = await api.toggleFavorite(placeId, user?.id);
     setFavorites(updated);
-    saveFavorites(updated);
   };
 
   const handleUpdateFilter = (partialFilter: Partial<SearchFilter>) => {
     setFilter((prev) => ({ ...prev, ...partialFilter }));
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch {
+      // ignore
+    }
+    setUser(null);
+    setFavorites(getSavedFavorites());
+    setHasStarted(false);
   };
 
   // Render Auth Screen on initial load if user has not entered guest mode
@@ -238,13 +281,10 @@ export function App() {
         user={user}
         activeView={activeView}
         onOpenAuth={() => setShowAuthModal(true)}
-        onLogout={() => {
-          setUser(null);
-          setHasStarted(false);
-        }}
+        onLogout={handleLogout}
         onGoHome={() => {
           setActiveView('home');
-          setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: SEARCH_RADIUS_KM, openNow: false, sortBy: 'rating' });
+          setFilter((prev) => ({ ...prev, query: '', category: 'all', minRating: 0, openNow: false, sortBy: 'rating' }));
         }}
         onOpenFavorites={() => setActiveView('favorites')}
         favoritesCount={favorites.length}
@@ -280,6 +320,7 @@ export function App() {
             locationLabel={locationLabel}
             onRequestGPS={requestGPSLocation}
             gpsLocked={gpsStatus === 'locked'}
+            activeRadiusKm={filter.maxDistanceKm}
           />
         )}
 
@@ -325,9 +366,9 @@ export function App() {
               searchQuery={filter.query || filter.category}
               currentRadius={filter.maxDistanceKm}
               onResetFilters={() =>
-                setFilter({ query: '', category: 'all', minRating: 0, maxDistanceKm: SEARCH_RADIUS_KM, openNow: false, sortBy: 'rating' })
+                setFilter((prev) => ({ ...prev, query: '', category: 'all', minRating: 0, openNow: false, sortBy: 'rating' }))
               }
-              onExpandRadius={() => setFilter((prev) => ({ ...prev, maxDistanceKm: 10 }))}
+              onExpandRadius={() => setFilter((prev) => ({ ...prev, maxDistanceKm: Math.min(25, (prev.maxDistanceKm || 4) + 2) }))}
               onFocusSearch={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             />
           ) : (
@@ -359,6 +400,7 @@ export function App() {
                   hoveredPlace={hoveredPlace}
                   onSelectPlace={setSelectedPlace}
                   userCoords={userCoords}
+                  activeRadiusKm={filter.maxDistanceKm}
                   heightClass="h-[500px] md:h-[calc(100vh-120px)]"
                 />
               </div>
@@ -426,11 +468,13 @@ export function App() {
       <BottomNav
         activeView={activeView}
         onChangeView={(view) => {
+          if (view === 'profile' && !user) {
+            setShowAuthModal(true);
+            return;
+          }
           setActiveView(view);
           if (view === 'explore') {
-            setFilter({ query: '', category: 'all', minRating: 0, openNow: true, sortBy: 'rating' });
-          } else if (view === 'alerts') {
-            setAlertNotification('GPS Traffic conditions optimal. 0 bottlenecks reported.');
+            setFilter((prev) => ({ ...prev, query: '', category: 'all', openNow: true }));
           }
         }}
         favoritesCount={favorites.length}

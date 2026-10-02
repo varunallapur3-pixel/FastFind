@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { api } from '../services/api';
-import { X, Lock, Mail, User as UserIcon, Zap, CheckCircle } from 'lucide-react';
+import { auth, googleProvider } from '../config/firebase';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signInWithPopup,
+} from 'firebase/auth';
+import { X, Lock, Mail, User as UserIcon, Zap, Compass } from 'lucide-react';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -24,25 +30,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onLoginSuccess })
     try {
       if (isSignUp) {
         if (!name || !email || !password) throw new Error('Please fill all required fields');
-        const user = await api.signup(name, email, password);
-        onLoginSuccess(user);
+        if (password.length < 6) throw new Error('Password must be at least 6 characters long');
+        const res = await createUserWithEmailAndPassword(auth, email, password);
+        if (res.user) {
+          await updateProfile(res.user, { displayName: name });
+        }
+        const token = await res.user.getIdToken();
+        const u: User = {
+          id: res.user.uid,
+          name: name.toUpperCase(),
+          email: res.user.email || email,
+          token,
+          favorites: [],
+          recentSearches: [],
+        };
+        onLoginSuccess(u);
       } else {
         if (!email || !password) throw new Error('Please enter email and password');
-        const user = await api.login(email, password);
-        onLoginSuccess(user);
+        const res = await signInWithEmailAndPassword(auth, email, password);
+        const token = await res.user.getIdToken();
+        const u: User = {
+          id: res.user.uid,
+          name: (res.user.displayName || email.split('@')[0]).toUpperCase(),
+          email: res.user.email || email,
+          token,
+          favorites: [],
+          recentSearches: [],
+        };
+        onLoginSuccess(u);
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed');
+      if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please try again.');
+      } else if (err.code === 'auth/email-already-in-use') {
+        setError('An account already exists with this email address.');
+      } else {
+        setError(err.message || 'Authentication failed');
+      }
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDemoLogin = async () => {
-    setLoading(true);
-    const user = await api.login('demo@fastfind.app', 'demo1234');
-    onLoginSuccess(user);
-    setLoading(false);
   };
 
   return (
@@ -152,15 +179,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onClose, onLoginSuccess })
           </button>
         </form>
 
-        {/* Demo Login */}
+        {/* Guest Mode */}
         <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-center">
           <button
             type="button"
-            onClick={handleDemoLogin}
+            onClick={onClose}
             className="w-full py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <CheckCircle className="w-4 h-4 text-emerald-500" />
-            <span>One-Click Demo Account</span>
+            <Compass className="w-4 h-4 text-brand-500" />
+            <span>Continue as Guest</span>
           </button>
         </div>
       </div>

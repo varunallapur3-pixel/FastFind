@@ -1,10 +1,31 @@
 import { CategoryId } from '../types';
 
-export const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+export const GOOGLE_MAPS_API_KEY = (import.meta as any)?.env?.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
-/** Strict search radius: 4 km (4000 meters) */
-export const SEARCH_RADIUS_KM = 4;
-export const SEARCH_RADIUS_METERS = 4000;
+/** Authoritative Search Radius Configuration */
+export const DEFAULT_RADIUS_KM = 4;
+export const MIN_RADIUS_KM = 0.5;
+export const MAX_RADIUS_KM = 25;
+export const RADIUS_STEP_KM = 0.5;
+export const PRESET_RADII = [1, 2, 4, 5, 10, 15];
+
+/** Backward compatibility references */
+export const SEARCH_RADIUS_KM = DEFAULT_RADIUS_KM;
+export const SEARCH_RADIUS_METERS = DEFAULT_RADIUS_KM * 1000;
+
+/**
+ * Normalizes any radius value into a safe, valid geographic radius (0.5 km to 25 km).
+ * Rejects NaN, Infinity, non-numbers, and clamps out-of-range values.
+ * Default for first visit/invalid input is always EXACTLY 4.0 km.
+ */
+export function normalizeRadius(value: any): number {
+  if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+    return DEFAULT_RADIUS_KM;
+  }
+  if (value < MIN_RADIUS_KM) return MIN_RADIUS_KM;
+  if (value > MAX_RADIUS_KM) return MAX_RADIUS_KM;
+  return Math.round(value * 10) / 10;
+}
 
 export function hasGoogleMapsApiKey(): boolean {
   return Boolean(GOOGLE_MAPS_API_KEY && GOOGLE_MAPS_API_KEY !== 'your_google_maps_api_key_here');

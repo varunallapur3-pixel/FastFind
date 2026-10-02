@@ -76,17 +76,18 @@ export const BottomHUD: React.FC<BottomHUDProps> = ({
           )}
         </button>
 
-        {/* Alerts */}
+        {/* Profile */}
         <button
-          onClick={() => onChangeView('alerts')}
+          onClick={() => onChangeView('profile')}
           className={`flex flex-col items-center justify-center transition-all ${
-            activeView === 'alerts'
+            activeView === 'profile'
               ? 'text-[#a9f900] drop-shadow-[0_0_8px_rgba(169,249,0,0.8)] scale-110'
               : 'text-[#849495] hover:text-white'
           }`}
+          aria-label="Account profile"
         >
-          <Bell className="w-5 h-5" />
-          <span className="font-mono text-[10px] mt-1 font-bold">ALERTS</span>
+          <UserIcon className="w-5 h-5" />
+          <span className="font-mono text-[10px] mt-1 font-bold">ACCOUNT</span>
         </button>
       </div>
     </footer>

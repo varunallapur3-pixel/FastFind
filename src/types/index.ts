@@ -99,4 +99,4 @@ export interface SearchFilter {
   sortBy: 'rating' | 'distance' | 'speed';
 }
 
-export type ActiveView = 'home' | 'results' | 'detail' | 'navigation' | 'favorites' | 'explore' | 'alerts';
+export type ActiveView = 'home' | 'results' | 'detail' | 'navigation' | 'favorites' | 'explore' | 'profile';

@@ -1,4 +1,41 @@
 import { GPSLocationDetails } from '../types';
+import { normalizeRadius } from '../config/maps';
+
+/**
+ * Validates latitude and longitude values strictly
+ */
+export function isValidCoords(lat: any, lng: any): boolean {
+  return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    !isNaN(lat) &&
+    !isNaN(lng) &&
+    isFinite(lat) &&
+    isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
+/**
+ * Strict geographic radius validator.
+ * Returns true if distance between (lat1, lon1) and (lat2, lon2) <= maxRadiusKm.
+ * 3.99 km -> true, 4.00 km -> true, 4.01 km -> false.
+ */
+export function isWithinRadius(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+  maxRadiusKm: number
+): boolean {
+  if (!isValidCoords(lat1, lon1) || !isValidCoords(lat2, lon2)) return false;
+  const normRadius = normalizeRadius(maxRadiusKm);
+  const dist = calculateDistanceKm(lat1, lon1, lat2, lon2);
+  return dist <= normRadius;
+}
 
 /**
  * Calculate distance between two lat/lng coordinates in kilometers (Haversine formula)
@@ -132,8 +169,25 @@ export function getGoogleMapsDirUrl(
   userLat?: number,
   userLng?: number
 ): string {
-  const originParam = userLat && userLng ? `${userLat},${userLng}` : 'My+Location';
-  const destParam = `${destLat},${destLng}`;
+  const safeUserLat = isValidCoords(userLat, userLng) ? userLat : undefined;
+  const safeUserLng = isValidCoords(userLat, userLng) ? userLng : undefined;
+  const safeDestLat = isValidCoords(destLat, destLng) ? destLat : 0;
+  const safeDestLng = isValidCoords(destLat, destLng) ? destLng : 0;
+
+  const originParam = safeUserLat !== undefined && safeUserLng !== undefined ? `${safeUserLat},${safeUserLng}` : 'My+Location';
+  const destParam = `${safeDestLat},${safeDestLng}`;
 
   return `https://www.google.com/maps/dir/?api=1&origin=${originParam}&destination=${destParam}&travelmode=driving&dir_action=navigate`;
+}
+
+/**
+ * Validates external web links to prevent unsafe URL protocol schemes (e.g. javascript:, data:, vbscript:)
+ */
+export function sanitizeWebUrl(url?: string): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  return '';
 }

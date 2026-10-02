@@ -32,18 +32,18 @@ export function clearRecentSearches(): string[] {
   return [];
 }
 
-export function getSavedFavorites(): string[] {
+export function getSavedFavorites(key: string = FAVORITES_KEY): string[] {
   try {
-    const saved = localStorage.getItem(FAVORITES_KEY);
+    const saved = localStorage.getItem(key);
     return saved ? JSON.parse(saved) : [];
   } catch {
     return [];
   }
 }
 
-export function saveFavorites(favorites: string[]): void {
+export function saveFavorites(favorites: string[], key: string = FAVORITES_KEY): void {
   try {
-    localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+    localStorage.setItem(key, JSON.stringify(favorites));
   } catch {
     // ignore
   }
