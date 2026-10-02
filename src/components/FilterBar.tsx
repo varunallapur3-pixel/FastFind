@@ -3,6 +3,8 @@ import { SearchFilter } from '../types';
 import { Filter, Clock, X, SlidersHorizontal, Check, MapPin } from 'lucide-react';
 import { DEFAULT_RADIUS_KM, MIN_RADIUS_KM, MAX_RADIUS_KM, RADIUS_STEP_KM, PRESET_RADII, normalizeRadius } from '../config/maps';
 
+import { resolveSearchIntent } from '../utils/searchIntent';
+
 interface FilterBarProps {
   filter: SearchFilter;
   onChangeFilter: (newFilter: Partial<SearchFilter>) => void;
@@ -18,6 +20,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
   const [showCustomSlider, setShowCustomSlider] = useState(false);
 
   const activeRadiusKm = normalizeRadius(filter.maxDistanceKm);
+  const intent = resolveSearchIntent(filter.query, filter.category);
 
   const activeFiltersCount =
     (filter.minRating > 0 ? 1 : 0) +
@@ -26,9 +29,13 @@ export const FilterBar: React.FC<FilterBarProps> = ({
     (filter.sortBy !== 'rating' ? 1 : 0);
 
   const formatCountLabel = (count: number, radiusKm: number) => {
-    if (count === 0) return `No places found within ${radiusKm} km`;
-    if (count === 1) return `1 place within ${radiusKm} km`;
-    return `${count} places within ${radiusKm} km`;
+    const label = intent.isGenericText && intent.query && intent.query !== 'places'
+      ? `matching "${intent.query}"`
+      : intent.categoryLabel;
+
+    if (count === 0) return `No ${label.toLowerCase()} found within ${radiusKm} km`;
+    if (count === 1) return `1 ${label.slice(-1) === 's' ? label.slice(0, -1) : label} within ${radiusKm} km`;
+    return `${count} ${label} within ${radiusKm} km`;
   };
 
   return (

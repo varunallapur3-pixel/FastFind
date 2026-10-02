@@ -7,28 +7,28 @@ import {
   normalizeRadius,
 } from '../config/maps';
 import { calculateDistanceKm, calculateDistanceMiles, getCityFromCoords, isValidCoords, isWithinRadius, sanitizeWebUrl } from '../utils/geo';
-import { parseSearchTarget } from '../utils/searchTarget';
+import { resolveSearchIntent, isPlaceRelevant, SearchIntent } from '../utils/searchIntent';
 import { loadGoogleMaps } from './googleMapsLoader';
 
 const DEFAULT_IMAGE =
   'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=800&q=80';
 
-function inferCategory(types: string[] = []): CategoryId {
+function inferCategory(types: string[] = [], fallbackCategory: CategoryId = 'all'): CategoryId {
   for (const type of types) {
     if (type && GOOGLE_TYPE_TO_CATEGORY[type]) {
       return GOOGLE_TYPE_TO_CATEGORY[type];
     }
   }
-  return 'restaurant';
+  return fallbackCategory;
 }
 
 function googleResultToPlace(
   result: google.maps.places.PlaceResult,
   userCoords: Coords,
   maxRadiusKm: number = DEFAULT_RADIUS_KM,
-  fallbackCategory: CategoryId = 'all'
+  intent?: SearchIntent
 ): Place | null {
-  if (!result.geometry?.location || !result.place_id) return null;
+  if (!result.geometry?.location || !result.place_id || !result.name) return null;
 
   const lat = typeof result.geometry.location.lat === 'function' ? result.geometry.location.lat() : (result.geometry.location as any).lat;
   const lng = typeof result.geometry.location.lng === 'function' ? result.geometry.location.lng() : (result.geometry.location as any).lng;
@@ -38,11 +38,20 @@ function googleResultToPlace(
   const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
   const strictMaxRadius = normalizeRadius(maxRadiusKm);
 
-  // STRICT DISTANCE FILTERING: reject any place strictly greater than selected radius
+  // STRICT DISTANCE FILTERING
   if (distanceKm > strictMaxRadius) return null;
 
-  const category =
-    fallbackCategory !== 'all' ? fallbackCategory : inferCategory(result.types);
+  const category = intent && intent.category !== 'all'
+    ? intent.category
+    : inferCategory(result.types, 'all');
+
+  const address = result.vicinity || result.formatted_address || 'Address unavailable';
+
+  // STRICT RELEVANCE VALIDATION
+  if (intent && !isPlaceRelevant({ name: result.name, category, address, types: result.types }, intent)) {
+    return null;
+  }
+
   const rating = result.rating ?? 4.0;
   const totalReviews = result.user_ratings_total ?? 0;
 
@@ -63,7 +72,7 @@ function googleResultToPlace(
 
   return {
     id: result.place_id,
-    name: result.name || 'Local Place',
+    name: result.name,
     category,
     categoryLabel: CATEGORY_LABELS[category] || 'PLACE',
     rating,
@@ -71,9 +80,9 @@ function googleResultToPlace(
     distanceKm,
     distanceMiles: calculateDistanceMiles(userCoords.lat, userCoords.lng, lat, lng),
     durationMins: Math.max(1, Math.round(distanceKm * 2.5)),
-    address: result.vicinity || result.formatted_address || 'Address unavailable',
+    address,
     phone: result.formatted_phone_number || '',
-    website: website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.name || 'place')}&query_place_id=${result.place_id}`,
+    website: website || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(result.name)}&query_place_id=${result.place_id}`,
     openStatus,
     openHours: openStatus ? 'Open Now' : 'Closed',
     image,
@@ -140,19 +149,19 @@ function runTextSearch(
 
 /**
  * OpenStreetMap Nominatim Fallback Provider
- * Ensures real local places are returned even if Google Places API is restricted or unavailable.
- * STRICTLY respects maxDistanceKm - filters out any result > selected radius.
+ * STRICTLY respects search intent - never queries or returns generic restaurants for dentists/garages.
  */
 export async function fetchOsmFallbackPlaces(
   filter: SearchFilter,
-  userCoords: Coords
+  userCoords: Coords,
+  intent?: SearchIntent
 ): Promise<Place[]> {
   const targetRadiusKm = normalizeRadius(filter.maxDistanceKm);
+  const activeIntent = intent || resolveSearchIntent(filter.query, filter.category);
 
   try {
     const userCity = await getCityFromCoords(userCoords.lat, userCoords.lng);
-    const categoryLabel = CATEGORY_LABELS[filter.category] || filter.category;
-    const searchTerm = filter.query || (filter.category !== 'all' ? categoryLabel : 'places');
+    const searchTerm = activeIntent.searchTerms[0] || filter.query || 'places';
 
     const queryStr = userCity && userCity !== 'Your Location'
       ? `${searchTerm} near ${userCity}`
@@ -177,17 +186,19 @@ export async function fetchOsmFallbackPlaces(
 
       const distanceKm = calculateDistanceKm(userCoords.lat, userCoords.lng, lat, lng);
 
-      // STRICT RADIUS FILTERING FOR OSM FALLBACK
+      // STRICT RADIUS FILTERING
       if (distanceKm > targetRadiusKm) continue;
 
       const addressParts = item.address || {};
-      const rawName = item.name || addressParts.amenity || addressParts.shop || addressParts.road || `${categoryLabel} #${idx + 1}`;
+      const rawName = item.name || addressParts.amenity || addressParts.shop || addressParts.road || `${activeIntent.categoryLabel} #${idx + 1}`;
       const name = rawName.charAt(0).toUpperCase() + rawName.slice(1);
       const address = item.display_name?.split(',').slice(0, 3).join(',') || `${userCity}`;
 
-      const category = filter.category !== 'all' ? filter.category : inferCategory([item.type, item.class]);
+      const category = activeIntent.category !== 'all'
+        ? activeIntent.category
+        : inferCategory([item.type, item.class], 'all');
 
-      places.push({
+      const placeObj = {
         id: `osm_${item.place_id}`,
         name,
         category,
@@ -208,7 +219,13 @@ export async function fetchOsmFallbackPlaces(
         crowdDensity: 0,
         coords: { lat, lng },
         features: [`${distanceKm} km away`],
-      });
+        types: [item.type, item.class].filter(Boolean),
+      };
+
+      // STRICT RELEVANCE CHECK FOR OSM FALLBACK
+      if (isPlaceRelevant(placeObj, activeIntent)) {
+        places.push(placeObj);
+      }
     }
 
     return sortPlaces(places, filter.sortBy);
@@ -247,6 +264,7 @@ export async function searchGooglePlaces(
   userCoords: Coords
 ): Promise<Place[]> {
   const targetRadiusKm = normalizeRadius(filter.maxDistanceKm);
+  const intent = resolveSearchIntent(filter.query, filter.category);
 
   let places: Place[] = [];
 
@@ -263,43 +281,32 @@ export async function searchGooglePlaces(
     });
     const service = new google.maps.places.PlacesService(map);
 
-    const { query, category } = filter.query
-      ? parseSearchTarget(filter.query)
-      : { query: '', category: filter.category };
-
     let rawResults: google.maps.places.PlaceResult[] = [];
-    const googleType = category !== 'all' ? CATEGORY_TO_GOOGLE_TYPE[category] : undefined;
-    const categoryLabel = CATEGORY_LABELS[category] || category;
 
-    if (query) {
-      try {
-        rawResults = await runTextSearch(service, { query, location, radius: searchRadiusMeters });
-      } catch {
-        rawResults = [];
-      }
-      if (rawResults.length === 0) {
+    // Query Google Places with SearchIntent search terms & Google types
+    if (intent.googleTypes.length > 0) {
+      for (const gType of intent.googleTypes) {
         try {
-          rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters, keyword: query });
+          const res = await runNearbySearch(service, { location, radius: searchRadiusMeters, type: gType });
+          rawResults.push(...res);
         } catch {
-          rawResults = [];
+          // ignore
         }
       }
-    } else if (category !== 'all') {
-      if (googleType) {
+    }
+
+    if (rawResults.length === 0 && intent.searchTerms.length > 0) {
+      for (const term of intent.searchTerms) {
         try {
-          rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters, type: googleType });
+          const res = await runTextSearch(service, { query: term, location, radius: searchRadiusMeters });
+          rawResults.push(...res);
         } catch {
-          rawResults = [];
+          // ignore
         }
       }
-      if (rawResults.length === 0) {
-        try {
-          rawResults = await runTextSearch(service, { query: categoryLabel, location, radius: searchRadiusMeters });
-        } catch {
-          rawResults = [];
-        }
-      }
-    } else {
+    }
+
+    if (rawResults.length === 0 && intent.category === 'all') {
       try {
         rawResults = await runNearbySearch(service, { location, radius: searchRadiusMeters });
       } catch {
@@ -308,7 +315,7 @@ export async function searchGooglePlaces(
     }
 
     places = rawResults
-      .map((r) => googleResultToPlace(r, userCoords, targetRadiusKm, category !== 'all' ? category : 'all'))
+      .map((r) => googleResultToPlace(r, userCoords, targetRadiusKm, intent))
       .filter((p): p is Place => p !== null);
   } catch (err) {
     console.warn('Google Places JS API search encountered an error, activating OSM fallback:', err);
@@ -316,7 +323,7 @@ export async function searchGooglePlaces(
 
   // Fallback to OSM Nominatim if Google Places API returns 0 results or throws error
   if (places.length === 0) {
-    places = await fetchOsmFallbackPlaces({ ...filter, maxDistanceKm: targetRadiusKm }, userCoords);
+    places = await fetchOsmFallbackPlaces({ ...filter, maxDistanceKm: targetRadiusKm }, userCoords, intent);
   }
 
   // Deduplicate by place_id
@@ -327,8 +334,8 @@ export async function searchGooglePlaces(
     return true;
   });
 
-  // Client-side strict distance re-filter (Guarantees <= targetRadiusKm)
-  places = places.filter((p) => p.distanceKm <= targetRadiusKm);
+  // Client-side strict distance & search relevance re-filter
+  places = places.filter((p) => p.distanceKm <= targetRadiusKm && isPlaceRelevant(p, intent));
 
   if (filter.minRating > 0) {
     places = places.filter((p) => p.rating >= filter.minRating);
@@ -353,12 +360,12 @@ export async function getGoogleTopRatedPlace(
   maxRadiusKm?: number
 ): Promise<Place | null> {
   const targetRadiusKm = normalizeRadius(maxRadiusKm);
-  const { query, category } = parseSearchTarget(queryOrCategory);
+  const intent = resolveSearchIntent(queryOrCategory);
 
   let results = await searchGooglePlaces(
     {
-      query,
-      category,
+      query: intent.query,
+      category: intent.category,
       minRating: 0,
       maxDistanceKm: targetRadiusKm,
       openNow: false,
@@ -367,5 +374,12 @@ export async function getGoogleTopRatedPlace(
     userCoords
   );
 
-  return results[0] ?? null;
+  const topMatch = results[0] ?? null;
+
+  // STRICT RELEVANCE GUARANTEE FOR TOP RATED RECOMMENDATION
+  if (topMatch && !isPlaceRelevant(topMatch, intent)) {
+    return null;
+  }
+
+  return topMatch;
 }
